@@ -82,4 +82,6 @@ License
 
 Please see `LICENSE.md` in this repository.
 
-This project uses PistonDevelopers/rust-image, which is MIT-licensed. According to Wikipedia, it is safe to use MIT-licensed software in this project.
+This project uses [PistonDevelopers/rust-image][1], which is MIT-licensed. According to Wikipedia, it is safe to use MIT-licensed software in this project.
+
+[1]: https://github.com/PistonDevelopers/rust-image
