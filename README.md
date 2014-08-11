@@ -6,7 +6,7 @@ A tool for finding duplicate and similar images in directory trees, written in R
 Thanks to Dr. Neal Krawetz for the outlines of the Average-Mean and DCT-Mean perceptual hash algorithms:  
 http://www.hackerfactor.com/blog/?/archives/432-Looks-Like-It.html (Accessed August 2014)
 
-Thanks to Emil Mikulic for the 2D Discrete Cosine Transform implementation in C, ported to Rust in `src/dst.rs`:  
+Thanks to Emil Mikulic for the 2D Discrete Cosine Transform implementation in C, ported to Rust in `src/dct.rs`:  
 http://unix4lyfe.org/dct/ (Implementation: http://unix4lyfe.org/dct/listing2.c) (Accessed August 2014)
 
 Unfortunately, the AAN algorithm that provides `O(n log n)` performance didn't seem to be viable for arbitrary-length input vectors without massive code duplicaton. This shouldn't be much of a concern as the program is largely I/O bound and the actual time spent hashing will be insignificant compared to the run time of the program as a whole.
@@ -59,7 +59,7 @@ for most use cases, as discovered via brief experimentation. It will output its 
 
 You might see performance improvements using a higher number of threads than the default (the number of cores in your CPU as reported by your OS), since many of them will be blocked on I/O at any given point. An SSD or RAMDisk might further improve search speeds, as will a properly defragmented hard drive (if using NTFS).
 
-However, in my experiments, all 8 cores were at 100% capacity most of the time, so the bottleneck might actually be in decoding the images and not loading them from disk.
+However, in my experiments, all 8 cores were at 100% capacity most of the time, so the bottleneck might actually be in decoding the images and not loading them from disk. Further experimentation with the help of a profiler might be needed.
 
 A `--threshold` of greater than 3(%) difference often produces misleading results, as the perceptual hash will find images that are "similar" in structure or composition but aren't subjectively similar to the human eye. Exact duplicates are always 0% different, and resizes and minor edits are usually within 2%.
 
