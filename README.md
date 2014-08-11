@@ -81,3 +81,5 @@ License
 =======
 
 Please see `LICENSE.md` in this repository.
+
+This project uses PistonDevelopers/rust-image, which is MIT-licensed. According to Wikipedia, it is safe to use MIT-licensed software in this project.
