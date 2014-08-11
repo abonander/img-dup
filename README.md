@@ -61,7 +61,7 @@ You might see performance improvements using a higher number of threads than the
 
 However, in my experiments, all 8 cores were at 100% capacity most of the time, so the bottleneck might actually be in decoding the images and not loading them from disk.
 
-A `--threshold` of greater than 3(%) difference often produces misleading results, as the perceptual hash will find images that are "similar" in structure or composition but aren't truly similar to the human eye. Exact duplicates are always 0% different, and resizes and minor edits are usually within 2%.
+A `--threshold` of greater than 3(%) difference often produces misleading results, as the perceptual hash will find images that are "similar" in structure or composition but aren't subjectively similar to the human eye. Exact duplicates are always 0% different, and resizes and minor edits are usually within 2%.
 
 If detail is a concern, a larger threshold should be used with a larger `--hash-size` setting, though memory usage increases on the order of `O([number of images] * hash-size^2)`. The actual image data isn't kept in memory after being hashed, so memory usage shouldn't be much of a concern. In the above test, `img-dup` kept below 500MB for the duration of the test.
 
