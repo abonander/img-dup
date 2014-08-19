@@ -1,27 +1,23 @@
+#![feature(macro_rules)]
+
+extern crate getopts;
 extern crate image;
+extern crate serialize;
 extern crate time;
 
-use processing::{ProcessingError, ImageResult, Total};
-use img::{Image, UniqueImage};
-use hash::ImageHash;
-use output::{ProcessingResults, output_results};
-use parse_args::{ProgramSettings, HashSettings, parse_args};
-
-use image::{GenericImage, ImageError};
-
-use self::time::now;
+use config::parse_args;
+use output::output_results;
+use processing::process;
 
 use std::ascii::AsciiExt;
 use std::io::fs;
 use std::os;
 
-#![feature(macro_rules)]
-
+mod config;
 mod dct;
 mod img;
 mod hash;
 mod output;
-mod parse_args;
 mod processing;
 
 fn main() {

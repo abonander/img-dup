@@ -1,9 +1,9 @@
-extern crate image;
-
-use std::path::Path;
-
 use hash::ImageHash;
-use processing::json_insert;
+
+use serialize::json::{Json, ToJson, Object};
+
+use std::collections::TreeMap;
+use std::path::Path;
 
 #[deriving(Clone)]
 pub struct Image {
@@ -26,6 +26,17 @@ impl Image {
 
     fn relative_path(&self, relative_to: &Path) -> Path {
         self.path.path_relative_from(relative_to).unwrap_or(self.path.clone())
+    }
+
+    pub fn to_treemap(&self, relative_to(&Path)) -> TreeMap<String, Json> {
+        let json = TreeMap::new();
+
+        json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
+        json_insert!(json, "hash", self.hash.to_base64());
+        json_insert!(json, "width", &self.width);
+        json_insert!(json, "height", &self.height);
+
+        json
     }
 }
 
@@ -76,6 +87,18 @@ impl UniqueImage {
     pub fn similars_len(&self) -> uint {
         self.similars.len()
     }
+
+    pub fn to_json(&self, relative_to: &Self) -> Json {
+        let mut json = self.img.to_treemap(relative_to);
+
+        let similars_json: Vec<Json> = self.similars.iter()
+            .map( |similar| similar.to_json(relative_to) )
+            .collect();
+
+        json_insert!(json, "similars", similars_json);
+
+        Object(json)
+    }
 }
 
 #[deriving(Clone)]
@@ -100,6 +123,14 @@ impl SimilarImage {
             self.img.width, self.img.height,
             self.img.relative_path(relative_to).display()
         );
+    }
+
+    fn to_json(&self, relative_to: &Path) -> Json {
+        let mut json = self.img.to_treemap(relative_to);
+
+        json_insert!(json, "diff", self.dist_ratio);
+
+        Object(json)
     }
 }
 

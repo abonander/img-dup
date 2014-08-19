@@ -1,9 +1,15 @@
-extern crate serialize;
+use config::{ProgramSettings, HashSettings};
+use hash::ImageHash;
+use img::{Image, UniqueImage};
 
-use output::json_insert;
+use image;
+use image::{GenericImage, ImageError};
 
 use serialize::json::{ToJson, Json, Object};
+use time::{Tm, now};
 
+use std::collections::TreeMap;
+use std::fmt::{Formatter, FormatError, Show};
 use std::rt::unwind::try;
 use std::sync::Future;
 use std::sync::deque::{BufferPool, Data, Empty};
@@ -19,10 +25,69 @@ pub struct Results {
     errors: Vec<ProcessingError>,    
 }
 
+impl Results {
+
+    pub fn to_json(&self, relative_to: &Path) -> Json {
+        let mut info = TreeMap::new();
+        json_insert!(info, "start", self.start_time.ctime());
+        json_insert!(info, "end", self.end_time.ctime());
+        json_insert!(info, "found", self.total);
+        json_insert!(info, "processed", self.uniques.len());
+        json_insert!(info, "errors", self.errors.len());
+
+        let
+
+        let mut my_json = TreeMap::new();
+        json_insert!(my_json, "info", info);
+
+        let images_json: Vec<Json> = self.uniques.iter()
+            .map( |unique| unique.to_json(relative_to) )
+            .collect();
+
+        json_insert!(my_json, "images", images_json);
+
+        let errors_json: Vec<Json> = self.errors.iter()
+            .map( |error| error.to_json(relative_to) )
+            .collect();
+
+        json_insert!(my_json, "errors", errors_json);
+
+        Object(my_json)
+    }
+} 
+
 #[deriving(Send)]
 pub enum ProcessingError {
     DecodingError(Path, ImageError),
     MiscError(Path, String),
+}
+
+impl ProcessingError {
+    
+    pub fn relative_path(&self, relative_to: &Path) -> Path {
+        let path = match self {
+            DecodingError(ref path, _) => path,
+            MiscError(ref path, _) => path,
+        }
+
+        path.path_relative_from(relative_to).unwrap_or(path.clone)
+    }
+
+    pub fn error_msg(&self) -> String {
+        match self {
+            DecodingError(_, ref img_err) => format!("Decoding error: {}", img_err),
+            MiscError(_, ref misc_err) => format!("Processing error: {}", misc_err),
+        }
+    }
+
+    pub fn to_json(&self, relative_to: &Path) -> Json {
+        let mut json = TreeMap::new();
+
+        json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
+        json_insert!(json, "error", self.error_msg());
+
+        Object(json)        
+    }
 }
 
 impl Show for ProcessingError {
@@ -38,25 +103,6 @@ impl Show for ProcessingError {
 }
 
 
-
-impl ToJson for Results {
-
-    fn to_json(&self) -> Json {
-        let mut info = Treemap::new();
-        json_insert!(info, "start", self.start_time.ctime());
-        json_insert!(info, "end", self.end_time.ctime());
-        json_insert!(info, "found", self.total);
-        json_insert!(info, "processed", self.uniques.len());
-        json_insert!(info, "errors", self.errors.len());
-
-        let mut my_json = Treemap::new();
-        json_insert!(my_json, info);
-        json_insert!(my_json, "images", self.images.as_slice());
-        json_insert!(my_json, "errors", self.errors.as_slice());
-
-        my_json.to_json();
-    }
-} 
 
 pub type ImageResult = Result<Image, ProcessingError>;
 
@@ -74,7 +120,7 @@ pub fn process(settings: &ProgramSettings, paths: Vec<Path>) -> Results {
     Results {
         total: total,
         start_time: start_time,
-        end_time: end_time,
+        end_time: now(),
         uniques: uniques,
         errors: errors,
     }    
