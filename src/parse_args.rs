@@ -17,6 +17,7 @@ pub struct ProgramSettings {
     pub outfile: Option<Path>,
     pub dup_only: bool,
     pub limit: uint,
+    pub json: JsonSettings,
 }
 
 impl ProgramSettings {
@@ -88,6 +89,19 @@ impl Show for ProgramSettings {
 pub struct HashSettings {
     pub hash_size: u32,
     pub fast: bool,
+}
+
+pub enum JsonSettings {
+    NoJson,
+    Json,
+    PrettyJson(uint),
+}
+
+impl JsonSettings {
+
+    pub fn is_json(&self) -> bool {
+        self != NoJson
+    }
 }
 
 pub fn parse_args(args: &[String]) -> ProgramSettings {

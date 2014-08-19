@@ -3,6 +3,7 @@ extern crate image;
 use std::path::Path;
 
 use hash::ImageHash;
+use processing::json_insert;
 
 #[deriving(Clone)]
 pub struct Image {
