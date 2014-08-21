@@ -1,58 +1,90 @@
 use config::{ProgramSettings, HashSettings};
 use hash::ImageHash;
 use img::{Image, UniqueImage};
+use output::newline_before_after;
 
 use image;
-use image::{GenericImage, ImageError};
+use image::{DynamicImage, GenericImage, ImageError};
 
-use serialize::json::{ToJson, Json, Object};
+use serialize::json::{ToJson, Json, Object, List};
 use time::{Tm, now};
 
+use std::boxed::BoxAny;
 use std::collections::TreeMap;
-use std::fmt::{Formatter, FormatError, Show};
+use std::io::IoResult;
 use std::rt::unwind::try;
 use std::sync::Future;
 use std::sync::deque::{BufferPool, Data, Empty};
 use std::task::deschedule;
-use std::to_string::ToString;
 
 #[deriving(Send)]
 pub struct Results {
-    total: Total,
-    start_time: Tm,
-    end_time: Tm,
-    uniques: Vec<UniqueImage>,
-    errors: Vec<ProcessingError>,    
+    pub total: Total,
+    pub start_time: Tm,
+    pub end_time: Tm,
+    pub uniques: Vec<UniqueImage>,
+    pub errors: Vec<ProcessingError>,    
 }
 
 impl Results {
 
-    pub fn to_json(&self, relative_to: &Path) -> Json {
+    fn start_time(&self) -> String {
+        self.start_time.ctime()
+    }
+
+    fn end_time(&self) -> String {
+        self.end_time.ctime()
+    }    
+
+    pub fn info_json(&self) -> Json {
         let mut info = TreeMap::new();
-        json_insert!(info, "start", self.start_time.ctime());
-        json_insert!(info, "end", self.end_time.ctime());
+        json_insert!(info, "start", self.start_time());
+        json_insert!(info, "end", self.end_time());
         json_insert!(info, "found", self.total);
         json_insert!(info, "processed", self.uniques.len());
         json_insert!(info, "errors", self.errors.len());
 
-        let
+        Object(info)
+    }
 
-        let mut my_json = TreeMap::new();
-        json_insert!(my_json, "info", info);
-
-        let images_json: Vec<Json> = self.uniques.iter()
+    pub fn uniques_json(&self, relative_to: &Path) -> Json {
+        let uniques_json: Vec<Json> = self.uniques.iter()
             .map( |unique| unique.to_json(relative_to) )
             .collect();
 
-        json_insert!(my_json, "images", images_json);
+        List(uniques_json)
+    }
 
+    pub fn errors_json(&self, relative_to: &Path) -> Json {
         let errors_json: Vec<Json> = self.errors.iter()
             .map( |error| error.to_json(relative_to) )
             .collect();
 
-        json_insert!(my_json, "errors", errors_json);
+        List(errors_json)        
+    }
 
-        Object(my_json)
+    pub fn write_info(&self, out: &mut Writer) -> IoResult<()> {
+        try!(writeln!(out, "Start time: {}", self.start_time()));
+        try!(writeln!(out, "End time: {}", self.end_time()));
+        try!(writeln!(out, "Images found: {}", self.total));
+        try!(writeln!(out, "Processed: {}", self.uniques.len()));
+        writeln!(out, "Errors: {}", self.errors.len())
+    }
+
+    pub fn write_uniques(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
+        for image in self.uniques.iter() {
+            try!(newline_before_after(out, |outa| image.write_self(outa, relative_to)));
+        }
+
+        Ok(())
+    }
+
+    pub fn write_errors(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
+        for error in self.errors.iter() {
+            try!(newline_before_after(out, |outa| error.write_self(outa, relative_to)));
+        }
+
+        Ok(())
     }
 } 
 
@@ -65,16 +97,16 @@ pub enum ProcessingError {
 impl ProcessingError {
     
     pub fn relative_path(&self, relative_to: &Path) -> Path {
-        let path = match self {
+        let path = match *self {
             DecodingError(ref path, _) => path,
             MiscError(ref path, _) => path,
-        }
+        };
 
-        path.path_relative_from(relative_to).unwrap_or(path.clone)
+        path.path_relative_from(relative_to).unwrap_or(path.clone())
     }
 
-    pub fn error_msg(&self) -> String {
-        match self {
+    pub fn err_msg(&self) -> String {
+        match *self {
             DecodingError(_, ref img_err) => format!("Decoding error: {}", img_err),
             MiscError(_, ref misc_err) => format!("Processing error: {}", misc_err),
         }
@@ -84,32 +116,26 @@ impl ProcessingError {
         let mut json = TreeMap::new();
 
         json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
-        json_insert!(json, "error", self.error_msg());
+        json_insert!(json, "error", self.err_msg());
 
         Object(json)        
     }
-}
 
-impl Show for ProcessingError {
-    
-    fn fmt(&self, out: &mut Formatter) -> Result<(), FormatError> {
-        match self {
-            DecodingError(&path, &img_err) =>
-                writeln!(out, "Error decoding image: {}\nReason: {}", path.display(), img_err),
-            MiscError(&path, &err) =>
-                writeln!(out, "Error processing image: {}\nReason: {}", path.display(), err.as_slice()),
-        }
+    pub fn write_self(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
+        writeln!(out, "Image: {}\n {}\n", self.relative_path(relative_to).display().to_string(), self.err_msg())
     }
 }
-
-
 
 pub type ImageResult = Result<Image, ProcessingError>;
 
 pub type Total = uint;
 
-pub fn process_future(settings: &ProgramSettings, paths: Vec<Path>) -> Future<Results> {
-    Future::spawn(proc(){ process(settings, paths) })    
+#[allow(dead_code)]
+pub fn process_future(settings: ProgramSettings, paths: Vec<Path>) -> Future<(ProgramSettings, Results)> { 
+    Future::spawn(proc() {
+        let results = process(&settings, paths);
+        (settings, results)
+    } )    
 }
 
 pub fn process(settings: &ProgramSettings, paths: Vec<Path>) -> Results {
@@ -152,16 +178,18 @@ fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
 
         spawn(proc() {            
             loop {
-                let img_result = match task_stealer.steal() {
-                    Data(path) => load_and_hash_image(&hash_settings, path),
+                match task_stealer.steal() {
+                    Data(path) => {
+                        let img_result = load_and_hash_image(&hash_settings, path);
+                                                
+                        if task_tx.send_opt(img_result).is_err() { 
+                            break;    
+                        }
+                    },
                     Empty => break,
-                    _ => None,
+                    _ => (),
                 };
                
-                if task_tx.send_opt(img_result).is_err() { 
-                    break;    
-                }
-
                 deschedule();
             }
         });
@@ -170,7 +198,7 @@ fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
     rx
 }
 
-fn load_and_hash_image(settings: &HashSettings, path: Path) -> ImageResult {
+pub fn load_and_hash_image(settings: &HashSettings, path: Path) -> ImageResult {
     match image::open(&path) {
         Ok(image) => try_hash_image(path, &image,
                                     settings.hash_size, settings.fast),
@@ -178,20 +206,26 @@ fn load_and_hash_image(settings: &HashSettings, path: Path) -> ImageResult {
     }
 }
 
-fn try_hash_image(path: Path, img: &Image, hash_size: u32, fast: bool) -> Result<Image, String> {
+fn try_hash_image(path: Path, img: &DynamicImage, hash_size: u32, fast: bool) -> ImageResult {
     let (width, height) = img.dimensions(); 
     
     let img_hash = unsafe {
-        let mut hash: Option<Image> = None;
+        let mut maybe_hash: Option<ImageHash> = None;
 
-        try(|| hash = ImageHash::hash(img, hash_size, fast) );
+        let err = try(|| maybe_hash = Some(ImageHash::hash(img, hash_size, fast)) );
 
-        hash
+        match maybe_hash {
+            Some(actual_hash) => Ok(actual_hash),
+            None => {
+                let err = err.unwrap_err().downcast::<&'static str>().unwrap();
+                Err(err)                
+            }
+        }
     };
 
     match img_hash {
         Ok(hash) => Ok(Image::new(path, hash, width, height)),
-        Err(cause) => Err(MiscError(path, cause.to_string())),
+        Err(cause) => Err(MiscError(path, cause.into_string())),
     }        
 }
 

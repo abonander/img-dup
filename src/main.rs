@@ -13,6 +13,12 @@ use std::ascii::AsciiExt;
 use std::io::fs;
 use std::os;
 
+macro_rules! json_insert(
+    ($map:expr, $key:expr, $val:expr) => (
+        $map.insert($key.into_string(), $val.to_json())
+    );
+)
+
 mod config;
 mod dct;
 mod img;
@@ -47,7 +53,7 @@ fn main() {
 
     println!("");
 
-    output::output_results(results).unwrap()   
+    output::output_results(&settings, &results).unwrap()   
 }
 
 fn find_images(dir: &Path, exts: &[String], recurse: bool) -> Vec<Path> {

@@ -1,13 +1,13 @@
 use getopts::{OptGroup, optopt, optmulti, optflag, optflagopt, Matches, usage, getopts};
 
-use serialize::json::{ToJson, Json};
+use serialize::json::{ToJson, Json, Object};
 
 use std::collections::TreeMap;
-use std::fmt::{Show, FormatError, Formatter};
+use std::fmt::{Show, Formatter};
+use std::fmt::Result as FormatResult;
 use std::os;
 
-
-
+#[deriving(Send)]
 pub struct ProgramSettings {
     pub threads: uint,
     pub dir: Path,
@@ -84,15 +84,14 @@ impl ProgramSettings {
 }
 
 impl Show for ProgramSettings {
-    fn fmt(&self, fmt: &mut Formatter) -> Result<(), FormatError> {
-        writeln!(fmt, "Threads: {}", self.threads);
-        writeln!(fmt, "Directory: {}", &self.dir.display());
-        writeln!(fmt, "Recursive: {}", self.recurse);
-        writeln!(fmt, "Extensions: {}", self.exts.as_slice());
-        writeln!(fmt, "Hash size: {}", self.hash_size);
-        writeln!(fmt, "Threshold: {0:.2f}%", self.threshold * 100f32);
-        writeln!(fmt, "Fast: {}", self.fast);
-        Ok(())
+    fn fmt(&self, fmt: &mut Formatter) -> FormatResult {
+        try!(writeln!(fmt, "Threads: {}", self.threads));
+        try!(writeln!(fmt, "Directory: {}", &self.dir.display()));
+        try!(writeln!(fmt, "Recursive: {}", self.recurse));
+        try!(writeln!(fmt, "Extensions: {}", self.exts.as_slice()));
+        try!(writeln!(fmt, "Hash size: {}", self.hash_size));
+        try!(writeln!(fmt, "Threshold: {0:.2f}%", self.threshold * 100f32));
+        writeln!(fmt, "Fast: {}", self.fast)
     }
 }
 
@@ -101,15 +100,15 @@ impl ToJson for ProgramSettings {
     fn to_json(&self) -> Json {
         let mut my_json = TreeMap::new();
         json_insert!(my_json, "threads", self.threads);
-        json_insert!(my_json, "dir", self.display());
-        json_insert!(my_json, "recurse", self.recursive);
+        json_insert!(my_json, "dir", self.dir.display().to_string());
+        json_insert!(my_json, "recurse", self.recurse);
         json_insert!(my_json, "exts", self.exts.as_slice());
         json_insert!(my_json, "hash_size", self.hash_size);
         json_insert!(my_json, "threshold", self.threshold);
         json_insert!(my_json, "fast", self.fast);
         json_insert!(my_json, "limit", self.limit);
 
-        my_json.to_json()
+        Object(my_json)
     }
 }
 
@@ -118,6 +117,7 @@ pub struct HashSettings {
     pub fast: bool,
 }
 
+#[deriving(PartialEq, Eq)]
 pub enum JsonSettings {
     NoJson,
     Json,
@@ -127,7 +127,7 @@ pub enum JsonSettings {
 impl JsonSettings {
 
     pub fn is_json(&self) -> bool {
-        self != NoJson
+        *self != NoJson
     }
 }
 
