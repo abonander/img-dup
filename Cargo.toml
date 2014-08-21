@@ -1,8 +1,8 @@
 [package]
 
 name = "img-dup"
-version = "0.1.0"
-authors = [ "austin.bonander@gmail.com" ]
+version = "0.2.0"
+authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
 [dependencies.image]
 
