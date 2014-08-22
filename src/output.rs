@@ -71,8 +71,13 @@ fn write_output(settings: &ProgramSettings, results: &Results, out: &mut Writer)
 
 fn open_output(settings: &ProgramSettings) -> Box<Writer> {
     match settings.outfile {
-        Some(ref file) => box File::open(file).unwrap() as Box<Writer>,
+        Some(ref file) => box File::create(file).unwrap() as Box<Writer>,
         None => box stdout() as Box<Writer>,
     }
+}
+
+/// Test if the outfile is writable by trying to open it in write mode.
+pub fn test_outfile(outfile: &Path) -> IoResult<()> {
+    File::create(outfile).map(|_| ())
 }
 

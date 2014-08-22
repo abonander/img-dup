@@ -6,7 +6,7 @@ extern crate serialize;
 extern crate time;
 
 use config::{parse_args, ProgramSettings};
-use output::output_results;
+use output::{output_results, test_outfile};
 use processing::process;
 
 use std::ascii::AsciiExt;
@@ -35,6 +35,15 @@ fn main() {
     // Silence standard messages if we're outputting JSON
     let mut out = get_output(&settings);    
 
+    match settings.outfile {
+        Some(ref outfile) => {
+            (writeln!(out, "Testing output file ({})...",
+                outfile.display())).unwrap();
+            test_outfile(outfile).unwrap();
+        },
+        None => (),        
+    };
+    
     out.write_line("Searching for images...").unwrap();
 
     let mut image_paths = find_images(&settings.dir, 
