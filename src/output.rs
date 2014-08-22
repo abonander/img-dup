@@ -48,7 +48,8 @@ fn json_output(settings: &ProgramSettings, results: &Results, out: &mut Writer) 
 fn json_encode<'a>(json_config: &JsonSettings, json: Json, out: &'a mut Writer) -> IoResult<()> {
     match *json_config {
         PrettyJson(indent) => { 
-            let ref mut encoder = PrettyEncoder::with_indent(out, indent);
+            let ref mut encoder = PrettyEncoder::new(out);
+            encoder.set_indent(indent);
             json.encode(encoder)
         },
         Json => {

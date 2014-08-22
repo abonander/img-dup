@@ -5,12 +5,13 @@ extern crate image;
 extern crate serialize;
 extern crate time;
 
-use config::parse_args;
+use config::{parse_args, ProgramSettings};
 use output::output_results;
 use processing::process;
 
 use std::ascii::AsciiExt;
 use std::io::fs;
+use std::io::util::NullWriter;
 use std::os;
 
 macro_rules! json_insert(
@@ -31,7 +32,10 @@ fn main() {
 
     let settings = parse_args(args.as_slice());
 
-    println!("Searching for images...");
+    // Silence standard messages if we're outputting JSON
+    let mut out = get_output(&settings);    
+
+    out.write_line("Searching for images...").unwrap();
 
     let mut image_paths = find_images(&settings.dir, 
                                       settings.exts.as_slice(), 
@@ -39,19 +43,19 @@ fn main() {
 
     let image_count = image_paths.len();
 
-    println!("Images found: {}", image_count);
+    (writeln!(out, "Images found: {}", image_count)).unwrap();
 
     if settings.limit > 0 {
-        println!("Limiting to: {}", settings.limit);
+        (writeln!(out, "Limiting to: {}", settings.limit)).unwrap();
         image_paths.truncate(settings.limit);
     }
 
-    println!("Processing images in {} threads. Please wait...\n", 
-             settings.threads);
+    (writeln!(out, "Processing images in {} threads. Please wait...\n", 
+             settings.threads)).unwrap();
 
     let results = processing::process(&settings, image_paths);
 
-    println!("");
+    out.write_line("").unwrap();
 
     output::output_results(&settings, &results).unwrap()   
 }
@@ -78,5 +82,13 @@ fn check_ext<'a>(file: &'a Path, exts: &'a [&'a str]) -> bool {
         Some(ext) => exts.iter().any(|&a| a.eq_ignore_ascii_case(ext)),
         None => false
     }
+}
+
+fn get_output(settings: &ProgramSettings) -> Box<Writer> {
+    if settings.silent_stdout() {
+        box NullWriter as Box<Writer> 
+    } else {
+        box std::io::stdio::stdout() as Box<Writer>
+    }    
 }
 

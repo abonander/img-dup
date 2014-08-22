@@ -81,6 +81,10 @@ impl ProgramSettings {
             fast: self.fast,
         }          
     }
+
+    pub fn silent_stdout(&self) -> bool {
+        self.outfile.is_none() && self.json.is_json()
+    }
 }
 
 impl Show for ProgramSettings {

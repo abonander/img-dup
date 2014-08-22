@@ -1,6 +1,6 @@
 [root]
 name = "img-dup"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "image 0.0.0 (git+https://github.com/PistonDevelopers/rust-image.git#fd3f8f59107907e1ae010198598057eee64b2294)",
 ]
