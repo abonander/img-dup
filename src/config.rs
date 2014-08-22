@@ -1,11 +1,13 @@
-extern crate getopts;
+use getopts::{OptGroup, optopt, optmulti, optflag, optflagopt, Matches, usage, getopts};
 
+use serialize::json::{ToJson, Json, Object};
+
+use std::collections::TreeMap;
+use std::fmt::{Show, Formatter};
+use std::fmt::Result as FormatResult;
 use std::os;
-use self::getopts::{OptGroup, optopt, optmulti, optflag, Matches, 
-    usage, getopts};
 
-use std::fmt::{Show, FormatError, Formatter};
-
+#[deriving(Send)]
 pub struct ProgramSettings {
     pub threads: uint,
     pub dir: Path,
@@ -17,6 +19,7 @@ pub struct ProgramSettings {
     pub outfile: Option<Path>,
     pub dup_only: bool,
     pub limit: uint,
+    pub json: JsonSettings,
 }
 
 impl ProgramSettings {
@@ -61,6 +64,14 @@ impl ProgramSettings {
             optopt("l", "limit",
                    "Only process the given number of images.",
                    "[1+]"),
+            optflagopt("j", "json",
+                       "Output the results in JSON format.
+                       If outputting to stdout, normal output is suppressed.
+                       An integer may optionally be passed with this flag,
+                       indicating the number of spaces to indent per level.
+                       Otherwise, the JSON will be in compact format.
+                       See the README for details.",
+                       "[1+] (optional)"),
         )
     }
 
@@ -70,24 +81,58 @@ impl ProgramSettings {
             fast: self.fast,
         }          
     }
+
+    pub fn silent_stdout(&self) -> bool {
+        self.outfile.is_none() && self.json.is_json()
+    }
 }
 
 impl Show for ProgramSettings {
-    fn fmt(&self, fmt: &mut Formatter) -> Result<(), FormatError> {
-        writeln!(fmt, "Threads: {}", self.threads);
-        writeln!(fmt, "Directory: {}", &self.dir.display());
-        writeln!(fmt, "Recursive: {}", self.recurse);
-        writeln!(fmt, "Extensions: {}", self.exts.as_slice());
-        writeln!(fmt, "Hash size: {}", self.hash_size);
-        writeln!(fmt, "Threshold: {0:.2f}%", self.threshold * 100f32);
-        writeln!(fmt, "Fast: {}", self.fast);
-        Ok(())
+    fn fmt(&self, fmt: &mut Formatter) -> FormatResult {
+        try!(writeln!(fmt, "Threads: {}", self.threads));
+        try!(writeln!(fmt, "Directory: {}", &self.dir.display()));
+        try!(writeln!(fmt, "Recursive: {}", self.recurse));
+        try!(writeln!(fmt, "Extensions: {}", self.exts.as_slice()));
+        try!(writeln!(fmt, "Hash size: {}", self.hash_size));
+        try!(writeln!(fmt, "Threshold: {0:.2f}%", self.threshold * 100f32));
+        writeln!(fmt, "Fast: {}", self.fast)
+    }
+}
+
+impl ToJson for ProgramSettings {
+
+    fn to_json(&self) -> Json {
+        let mut my_json = TreeMap::new();
+        json_insert!(my_json, "threads", self.threads);
+        json_insert!(my_json, "dir", self.dir.display().to_string());
+        json_insert!(my_json, "recurse", self.recurse);
+        json_insert!(my_json, "exts", self.exts.as_slice());
+        json_insert!(my_json, "hash_size", self.hash_size);
+        json_insert!(my_json, "threshold", self.threshold);
+        json_insert!(my_json, "fast", self.fast);
+        json_insert!(my_json, "limit", self.limit);
+
+        Object(my_json)
     }
 }
 
 pub struct HashSettings {
     pub hash_size: u32,
     pub fast: bool,
+}
+
+#[deriving(PartialEq, Eq)]
+pub enum JsonSettings {
+    NoJson,
+    Json,
+    PrettyJson(uint),
+}
+
+impl JsonSettings {
+
+    pub fn is_json(&self) -> bool {
+        *self != NoJson
+    }
 }
 
 pub fn parse_args(args: &[String]) -> ProgramSettings {
@@ -112,6 +157,7 @@ pub fn parse_args(args: &[String]) -> ProgramSettings {
         outfile: opts.opt_str("outfile").map(|path| Path::new(path.as_slice())),
         dup_only: opts.opt_present("dup-only"),
         limit: uint_arg(opts, "limit", 0),
+        json: json_arg(opts, "json", NoJson),
     }    
 }
 
@@ -151,6 +197,17 @@ fn exts_args<'a>(args: &'a Matches, arg: &'a str, default: Vec<&'static str>)
     } else {
         default.iter().map(|str_slice| str_slice.into_string()).collect()
     }
+}
+
+fn json_arg(args: &Matches, arg: &str, default: JsonSettings) -> JsonSettings {
+    if args.opt_present(arg) {
+        match args.opt_str(arg) {
+            Some(indent) => PrettyJson(from_str::<uint>(indent.as_slice()).unwrap()),
+            None => Json,
+        }
+    } else {
+        default
+    }   
 }
 
 fn print_help_and_exit(opts: &[OptGroup]) {

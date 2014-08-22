@@ -1,10 +1,10 @@
-extern crate image;
-
 use dct::{dct_2d, crop_dct};
 
 use image::{GenericImage, DynamicImage, 
     ImageBuf, Luma, Pixel, FilterType, Nearest};
 use image::imageops::{grayscale, resize};
+
+use serialize::base64::{ToBase64, STANDARD};
 
 use std::collections::Bitv;
 
@@ -89,5 +89,13 @@ impl ImageHash {
             bitv: hash,
         }
     }
+
+    pub fn to_base64(&self) -> String {
+        let self_bytes = self.bitv.to_bytes();
+
+        self_bytes.as_slice().to_base64(STANDARD)
+    }
 }
+
+
 

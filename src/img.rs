@@ -1,8 +1,10 @@
-extern crate image;
-
-use std::path::Path;
-
 use hash::ImageHash;
+
+use serialize::json::{Json, ToJson, Object};
+
+use std::collections::TreeMap;
+use std::io::IoResult;
+use std::path::Path;
 
 #[deriving(Clone)]
 pub struct Image {
@@ -25,6 +27,17 @@ impl Image {
 
     fn relative_path(&self, relative_to: &Path) -> Path {
         self.path.path_relative_from(relative_to).unwrap_or(self.path.clone())
+    }
+
+    pub fn to_treemap(&self, relative_to: &Path) -> TreeMap<String, Json> {
+        let mut json = TreeMap::new();
+
+        json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
+        json_insert!(json, "hash", self.hash.to_base64());
+        json_insert!(json, "width", &self.width);
+        json_insert!(json, "height", &self.height);
+
+        json
     }
 }
 
@@ -58,22 +71,31 @@ impl UniqueImage {
         temp    
     }
 
-    pub fn write_self(&self, out: &mut Writer, relative_to: &Path) {
-        writeln!(out, "Original: ({}x{}) {} ", 
+    pub fn write_self(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
+        try!(writeln!(out, "Original: ({}x{}) {} ", 
                     self.img.width, self.img.height,
                     self.img.relative_path(relative_to).display()
-                );
-        out.write_line("Similars [% different]:");
+                ));
+        
+        try!(out.write_line("Similars [% different]:"));
     
         for similar in self.similars().iter() {
-            similar.write_self(out, relative_to);
+            try!(similar.write_self(out, relative_to));
         }
 
-        out.write_char('\n');
+        out.write_char('\n')
     }
 
-    pub fn similars_len(&self) -> uint {
-        self.similars.len()
+    pub fn to_json(&self, relative_to: &Path) -> Json {
+        let mut json = self.img.to_treemap(relative_to);
+
+        let similars_json: Vec<Json> = self.similars.iter()
+            .map( |similar| similar.to_json(relative_to) )
+            .collect();
+
+        json_insert!(json, "similars", similars_json);
+
+        Object(json)
     }
 }
 
@@ -93,12 +115,20 @@ impl SimilarImage {
         }
     }
 
-    fn write_self(&self, out: &mut Writer, relative_to: &Path) {
+    fn write_self(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
         writeln!(out, "[{0:.2f}%] ({1}x{2}) {3}",
             self.dist_ratio * 100f32,
             self.img.width, self.img.height,
             self.img.relative_path(relative_to).display()
-        );
+        )
+    }
+
+    fn to_json(&self, relative_to: &Path) -> Json {
+        let mut json = self.img.to_treemap(relative_to);
+
+        json_insert!(json, "diff", self.dist_ratio);
+
+        Object(json)
     }
 }
 
