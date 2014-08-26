@@ -74,7 +74,7 @@ A `--threshold` of greater than 3(%) difference often produces misleading result
 
 If detail is a concern, a larger threshold should be used with a larger `--hash-size` setting, though memory usage increases on the order of `O([number of images] * hash-size^2)`. The actual image data isn't kept in memory after being hashed, so memory usage shouldn't be much of a concern. In the above test, `img-dup` kept below 500MB for the duration of the test.
 
-GIF files are currently not searched for by default due to an elusive bug in `rust-image` that may or may not have to do with animations. You can add `--ext=gif` to search for them. It shouldn't be a huge problem since an invalid image can only crash a single processing thread, though crashed threads currently cannot be restarted. The other threads will continue until they finish the remaining work or crash, at which point the program will print the available results and exit normally.
+GIF files are currently not searched for by default due to an elusive bug in `rust-image` that may or may not have to do with animations. You can add `--ext=gif` to search for them. Errors produced during decoding or hashing are now safely caught and logged so the task can continue. Errored images are reported in the processing results.
 
 For JSON structure, see `JSON.md`.
 
