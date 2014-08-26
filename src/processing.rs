@@ -47,10 +47,15 @@ impl Results {
         Object(info)
     }
 
-    pub fn uniques_json(&self, relative_to: &Path) -> Json {
+    pub fn uniques_json(&self, relative_to: &Path, dup_only: bool) -> Json {
         let uniques_json: Vec<Json> = self.uniques.iter()
-            .map( |unique| unique.to_json(relative_to) )
-            .collect();
+        .filter_map( |unique| 
+                if dup_only && unique.similars.is_empty() {
+                    None
+                } else {
+                    Some(unique.to_json(relative_to))
+                }  
+        ).collect();
 
         List(uniques_json)
     }
@@ -71,9 +76,16 @@ impl Results {
         writeln!(out, "Errors: {}", self.errors.len())
     }
 
-    pub fn write_uniques(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
-        for image in self.uniques.iter() {
-            try!(newline_before_after(out, |outa| image.write_self(outa, relative_to)));
+    pub fn write_uniques(&self, out: &mut Writer, relative_to: &Path, dup_only: bool) -> IoResult<()> {
+        for unique in self.uniques.iter() {
+            if dup_only && unique.similars.is_empty() {
+                continue;
+            } else {
+                try!(
+                    newline_before_after(out, 
+                        |outa| unique.write_self(outa, relative_to))
+                );
+            }
         }
 
         Ok(())
@@ -81,7 +93,10 @@ impl Results {
 
     pub fn write_errors(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
         for error in self.errors.iter() {
-            try!(newline_before_after(out, |outa| error.write_self(outa, relative_to)));
+            try!(
+                newline_before_after(out, 
+                    |outa| error.write_self(outa, relative_to))
+            );
         }
 
         Ok(())

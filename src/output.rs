@@ -34,7 +34,7 @@ fn json_output(settings: &ProgramSettings, results: &Results, out: &mut Writer) 
 
         json_insert!(json, "settings", settings);
         json_insert!(json, "info", results.info_json());
-        json_insert!(json, "images", results.uniques_json(dir));
+        json_insert!(json, "images", results.uniques_json(dir, settings.dup_only));
         json_insert!(json, "errors", results.errors_json(dir));
 
         Object(json)
@@ -64,7 +64,7 @@ fn write_output(settings: &ProgramSettings, results: &Results, out: &mut Writer)
     try!(out.write_line("img-dup results follow.\nStats:"));
     try!(results.write_info(out));
     try!(out.write_line("\nImages:\n"));
-    try!(results.write_uniques(out, &settings.dir));
+    try!(results.write_uniques(out, &settings.dir, settings.dup_only));
     try!(out.write_line("\nErrors:\n"));
     results.write_errors(out, &settings.dir)    
 }
