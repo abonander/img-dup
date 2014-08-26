@@ -146,15 +146,17 @@ pub fn parse_args(args: &[String]) -> ProgramSettings {
 
     let exts_default = vec!("jpeg", "jpg", "png");
 
+    let dir = dir_arg(opts, "dir", os::getcwd());
+
     ProgramSettings {
         threads: uint_arg(opts, "threads", os::num_cpus()),
-        dir: dir_arg(opts, "dir", os::getcwd()),
+        dir: dir.clone(),
         recurse: opts.opt_present("recurse"),
         hash_size: uint_arg(opts, "hash-size", 8) as u32,
         threshold: pos_f32_arg(opts, "threshold", 3f32) / 100f32,
         fast: opts.opt_present("fast"),
         exts: exts_args(opts, "ext", exts_default),
-        outfile: opts.opt_str("outfile").map(|path| Path::new(path.as_slice())),
+        outfile: outfile_arg(opts, "outfile", &dir),
         dup_only: opts.opt_present("dup-only"),
         limit: uint_arg(opts, "limit", 0),
         json: json_arg(opts, "json", NoJson),
@@ -168,6 +170,17 @@ fn dir_arg(args: &Matches, arg: &str, default: Path) -> Path {
             arg, dir.display());
 
     dir
+}
+
+fn outfile_arg(args: &Matches, arg: &str, dir: &Path) -> Option<Path> {
+    args.opt_str(arg).map(|path| {
+        let path = Path::new(path);
+        if path.is_relative() {
+            dir.join(path)
+        } else {
+            path            
+        }
+    })
 }
 
 fn uint_arg(args: &Matches, arg: &str, default: uint) -> uint {
