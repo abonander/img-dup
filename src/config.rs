@@ -135,7 +135,7 @@ pub enum JsonSettings {
 impl JsonSettings {
 
     pub fn is_json(&self) -> bool {
-        *self != NoJson
+        *self != JsonSettings::NoJson
     }
 }
 
@@ -163,7 +163,7 @@ pub fn parse_args(args: &[String]) -> ProgramSettings {
         outfile: outfile_arg(opts, "outfile", &dir),
         dup_only: opts.opt_present("dup-only"),
         limit: uint_arg(opts, "limit", 0),
-        json: json_arg(opts, "json", NoJson),
+        json: json_arg(opts, "json", JsonSettings::NoJson),
     }    
 }
 
@@ -219,8 +219,8 @@ fn exts_args<'a>(args: &'a Matches, arg: &'a str, default: Vec<&'static str>)
 fn json_arg(args: &Matches, arg: &str, default: JsonSettings) -> JsonSettings {
     if args.opt_present(arg) {
         match args.opt_str(arg) {
-            Some(indent) => PrettyJson(from_str::<uint>(indent.as_slice()).unwrap()),
-            None => CompactJson,
+            Some(indent) => JsonSettings::PrettyJson(from_str::<uint>(indent.as_slice()).unwrap()),
+            None => JsonSettings::CompactJson,
         }
     } else {
         default

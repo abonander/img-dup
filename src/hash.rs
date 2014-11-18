@@ -1,14 +1,14 @@
 use dct::{dct_2d, crop_dct};
 
 use image::{GenericImage, DynamicImage, 
-    ImageBuf, Luma, Pixel, FilterType, Nearest};
+    ImageBuf, Luma, Pixel, FilterType, Nearest, Rgba};
 use image::imageops::{grayscale, resize};
 
 use serialize::base64::{ToBase64, STANDARD};
 
 use std::collections::Bitv;
 
-static FILTER_TYPE: FilterType = Nearest;
+const FILTER_TYPE: FilterType = Nearest;
 
 #[deriving(PartialEq, Eq, Hash, Show, Clone)]
 pub struct ImageHash {
@@ -30,14 +30,9 @@ impl ImageHash {
         self.dist(other) as f32 / self.size as f32
     }    
 
-    fn square_resize_and_gray(img: &DynamicImage, size: u32) 
-        -> ImageBuf<Luma<u8>> {
-        let small = resize(img, size, size, FILTER_TYPE);
-        grayscale(&small)
-    }
-
-    fn fast_hash(img: &DynamicImage, hash_size: u32) -> Bitv {
-        let temp = ImageHash::square_resize_and_gray(img, hash_size);
+    
+    fn fast_hash<Img: GenericImage<Rgba<u8>>>(img: &Img, hash_size: u32) -> Bitv {
+        let temp = square_resize_and_gray(img, hash_size);
 
         let hash_values: Vec<u8> = temp.pixels().map(|(_, _, x)| x.channel())
             .collect();
@@ -50,12 +45,12 @@ impl ImageHash {
         hash_values.into_iter().map(|x| x as uint >= mean).collect()
     }
 
-    fn dct_hash(img: &DynamicImage, hash_size: u32) -> Bitv {
+    fn dct_hash<Img: GenericImage<Rgba<u8>>>(img: &Img, hash_size: u32) -> Bitv {
         let large_size = hash_size * 4;
 
         // We take a bigger resize than fast_hash, 
         // then we only take the lowest corner of the DCT
-        let temp = ImageHash::square_resize_and_gray(img, large_size);
+        let temp = square_resize_and_gray(img, large_size);
 
         // Our hash values are converted to doubles for the DCT
         let hash_values: Vec<f64> = temp.pixels()
@@ -75,7 +70,7 @@ impl ImageHash {
         cropped_dct.into_iter().map(|x| x >= mean).collect()
     }    
 
-    pub fn hash(img: &DynamicImage, hash_size: u32, fast: bool) -> ImageHash {
+    pub fn hash<Img: GenericImage<Rgba<u8>>>(img: &Img, hash_size: u32, fast: bool) -> ImageHash {
         let hash = if fast { 
             ImageHash::fast_hash(img, hash_size)   
         } else { 
@@ -97,5 +92,8 @@ impl ImageHash {
     }
 }
 
-
+fn square_resize_and_gray<Img: GenericImage<Rgba<u8>>>(img: &Img, size: u32) -> ImageBuf<Luma<u8>> {
+        let small = resize(img, size, size, FILTER_TYPE);
+        grayscale(&small)
+}
 

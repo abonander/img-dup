@@ -14,12 +14,12 @@ source = "git+https://github.com/alexcrichton/gcc-rs#f25b3ba9c40303781189cc137fb
 [[package]]
 name = "image"
 version = "0.1.0"
-source = "git+https://github.com/PistonDevelopers/rust-image.git#3da4d9e150277c909d825eb3d34044c668b27377"
+source = "git+https://github.com/PistonDevelopers/rust-image.git#39c3135dc82f75afd560d9e644104351d1e9b2ca"
 
 [[package]]
 name = "time"
 version = "0.0.1"
-source = "git+https://github.com/rust-lang/time.git#f4bc73862b942b9c8d8fc92ffe72b73c6616a2ea"
+source = "git+https://github.com/rust-lang/time.git#3194d911a136a7bfa3218cdd5bd3379537de4133"
 dependencies = [
  "gcc 0.0.1 (git+https://github.com/alexcrichton/gcc-rs)",
 ]

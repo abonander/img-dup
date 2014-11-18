@@ -105,16 +105,16 @@ impl Results {
 
 #[deriving(Send)]
 pub enum ProcessingError {
-    DecodingError(Path, ImageError),
-    MiscError(Path, String),
+    Decoding(Path, ImageError),
+    Misc(Path, String),
 }
 
 impl ProcessingError {
     
     pub fn relative_path(&self, relative_to: &Path) -> Path {
         let path = match *self {
-            DecodingError(ref path, _) => path,
-            MiscError(ref path, _) => path,
+            ProcessingError::Decoding(ref path, _) => path,
+            ProcessingError::Misc(ref path, _) => path,
         };
 
         path.path_relative_from(relative_to).unwrap_or(path.clone())
@@ -122,8 +122,8 @@ impl ProcessingError {
 
     pub fn err_msg(&self) -> String {
         match *self {
-            DecodingError(_, ref img_err) => format!("Decoding error: {}", img_err),
-            MiscError(_, ref misc_err) => format!("Processing error: {}", misc_err),
+            ProcessingError::Decoding(_, ref img_err) => format!("Decoding error: {}", img_err),
+            ProcessingError::Misc(_, ref misc_err) => format!("Processing error: {}", misc_err),
         }
     }
 
@@ -217,7 +217,7 @@ pub fn load_and_hash_image(settings: &HashSettings, path: Path) -> ImageResult {
     match image::open(&path) {
         Ok(image) => try_hash_image(path, &image,
                                     settings.hash_size, settings.fast),
-        Err(img_err) => Err(DecodingError(path, img_err)),
+        Err(img_err) => Err(ProcessingError::Decoding(path, img_err)),
     }
 }
 
@@ -240,7 +240,7 @@ fn try_hash_image(path: Path, img: &DynamicImage, hash_size: u32, fast: bool) ->
 
     match img_hash {
         Ok(hash) => Ok(Image::new(path, hash, width, height)),
-        Err(cause) => Err(MiscError(path, cause.into_string())),
+        Err(cause) => Err(ProcessingError::Misc(path, cause.into_string())),
     }        
 }
 
