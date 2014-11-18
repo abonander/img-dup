@@ -1,4 +1,4 @@
-use hash::ImageHash;
+use img_hash::ImageHash;
 
 use serialize::json::{Json, ToJson, Object};
 

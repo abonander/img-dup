@@ -2,6 +2,7 @@
 
 extern crate getopts;
 extern crate image;
+extern crate img_hash;
 extern crate serialize;
 extern crate time;
 
@@ -23,9 +24,7 @@ macro_rules! json_insert(
 )
 
 mod config;
-mod dct;
 mod img;
-mod hash;
 mod output;
 mod processing;
 

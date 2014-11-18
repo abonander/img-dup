@@ -4,10 +4,10 @@ name = "img-dup"
 version = "0.3.0"
 authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
-[dependencies.image]
-
-git = "https://github.com/PistonDevelopers/rust-image.git"
-
 [dependencies.time]
 
 git = "https://github.com/rust-lang/time.git"
+
+[dependencies.img_hash]
+
+path = "img_hash/"

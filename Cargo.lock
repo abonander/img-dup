@@ -2,7 +2,7 @@
 name = "img-dup"
 version = "0.3.0"
 dependencies = [
- "image 0.1.0 (git+https://github.com/PistonDevelopers/rust-image.git)",
+ "img_hash 0.0.1",
  "time 0.0.1 (git+https://github.com/rust-lang/time.git)",
 ]
 
@@ -15,6 +15,13 @@ source = "git+https://github.com/alexcrichton/gcc-rs#f25b3ba9c40303781189cc137fb
 name = "image"
 version = "0.1.0"
 source = "git+https://github.com/PistonDevelopers/rust-image.git#39c3135dc82f75afd560d9e644104351d1e9b2ca"
+
+[[package]]
+name = "img_hash"
+version = "0.0.1"
+dependencies = [
+ "image 0.1.0 (git+https://github.com/PistonDevelopers/rust-image.git)",
+]
 
 [[package]]
 name = "time"

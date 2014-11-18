@@ -1,10 +1,11 @@
 use config::{ProgramSettings, HashSettings};
-use hash::ImageHash;
 use img::{Image, UniqueImage};
 use output::newline_before_after;
 
 use image;
 use image::{DynamicImage, GenericImage, ImageError};
+
+use img_hash::ImageHash;
 
 use serialize::json::{ToJson, Json, Object, List};
 use time::{Tm, now};
