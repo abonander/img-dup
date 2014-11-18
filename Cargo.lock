@@ -2,7 +2,7 @@
 name = "img-dup"
 version = "0.3.0"
 dependencies = [
- "img_hash 0.0.1",
+ "img_hash 0.0.1 (git+https://github.com/cybergeek94/img_hash.git)",
  "time 0.0.1 (git+https://github.com/rust-lang/time.git)",
 ]
 
@@ -19,6 +19,7 @@ source = "git+https://github.com/PistonDevelopers/rust-image.git#39c3135dc82f75a
 [[package]]
 name = "img_hash"
 version = "0.0.1"
+source = "git+https://github.com/cybergeek94/img_hash.git#92237c52b5ccf19643017e9b36efefaad6292575"
 dependencies = [
  "image 0.1.0 (git+https://github.com/PistonDevelopers/rust-image.git)",
 ]
