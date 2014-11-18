@@ -29,11 +29,11 @@ pub struct Results {
 impl Results {
 
     fn start_time(&self) -> String {
-        self.start_time.ctime()
+        self.start_time.ctime().to_string()
     }
 
     fn end_time(&self) -> String {
-        self.end_time.ctime()
+        self.end_time.ctime().to_string()
     }    
 
     pub fn info_json(&self) -> Json {
@@ -179,7 +179,7 @@ fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
     let buffer: BufferPool<Path> = BufferPool::new();   
     let (worker, stealer) = buffer.deque();
 
-    for path in paths.move_iter() {
+    for path in paths.into_iter() {
         worker.push(path);
     }
 
@@ -187,7 +187,7 @@ fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
 
     let hash_settings = settings.hash_settings();
 
-    for thread in range(0, settings.threads) {
+    for _ in range(0, settings.threads) {
         let task_stealer = stealer.clone();
         let task_tx = tx.clone();
 
@@ -274,11 +274,7 @@ fn manage_images(images: &mut Vec<UniqueImage>,
         .map(|(idx, _)| idx);
 
     match parent_idx {
-        Some(index) => {
-            let parent = images.get_mut(index);
-
-            parent.add_similar(image);
-        },
+        Some(index) => images[index].add_similar(image),
         None => images.push(UniqueImage::from_image(image)),
     }
 }

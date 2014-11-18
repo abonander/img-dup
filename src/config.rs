@@ -3,8 +3,12 @@ use getopts::{OptGroup, optopt, optmulti, optflag, optflagopt, Matches, usage, g
 use serialize::json::{ToJson, Json, Object};
 
 use std::collections::TreeMap;
+
 use std::fmt::{Show, Formatter};
 use std::fmt::Result as FormatResult;
+
+use std::io::fs::PathExtensions;
+
 use std::os;
 
 #[deriving(Send)]
@@ -124,7 +128,7 @@ pub struct HashSettings {
 #[deriving(PartialEq, Eq)]
 pub enum JsonSettings {
     NoJson,
-    Json,
+    CompactJson,
     PrettyJson(uint),
 }
 
@@ -216,7 +220,7 @@ fn json_arg(args: &Matches, arg: &str, default: JsonSettings) -> JsonSettings {
     if args.opt_present(arg) {
         match args.opt_str(arg) {
             Some(indent) => PrettyJson(from_str::<uint>(indent.as_slice()).unwrap()),
-            None => Json,
+            None => CompactJson,
         }
     } else {
         default
@@ -226,5 +230,5 @@ fn json_arg(args: &Matches, arg: &str, default: JsonSettings) -> JsonSettings {
 fn print_help_and_exit(opts: &[OptGroup]) {
     println!("{}", usage("Duplicate Image Finder", opts));
 
-    fail!("Exiting...");
+    panic!("Exiting...");
 }

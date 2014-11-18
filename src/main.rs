@@ -10,8 +10,10 @@ use output::{output_results, test_outfile};
 use processing::process;
 
 use std::ascii::AsciiExt;
-use std::io::fs;
+
+use std::io::fs::{mod, PathExtensions};
 use std::io::util::NullWriter;
+
 use std::os;
 
 macro_rules! json_insert(
@@ -80,7 +82,7 @@ fn find_images(dir: &Path, exts: &[String], recurse: bool) -> Vec<Path> {
     } else {
         fs::readdir(dir)
             .unwrap()
-            .move_iter()
+            .into_iter()
             .filter( |file| !file.is_dir() && check_ext(file, exts.as_slice()) )
             .collect()
     } 

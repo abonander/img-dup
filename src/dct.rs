@@ -5,7 +5,7 @@ pub fn dct_2d(packed_2d: &[f64], width: uint, height: uint) -> Vec<f64> {
     assert!(packed_2d.len() == width * height, 
             "Slice length must be width * height!");
 
-    let packed_2d = Vec::from_slice(packed_2d);
+    let packed_2d = packed_2d.to_vec();
 
     let rows = rows(packed_2d, width, height);
     let dct_rows: Vec<Vec<f64>> = rows.iter()
@@ -24,7 +24,7 @@ fn rows(packed_2d: Vec<f64>, width: uint, height: uint) -> Vec<Vec<f64>> {
     for y in range(0, height) {
         let start = y * width;
         let end = start + width;
-        rows.insert(y, Vec::from_slice(packed_2d.slice(start, end)));         
+        rows.insert(y, packed_2d.slice(start, end).to_vec());         
     }
 
     rows
@@ -72,7 +72,7 @@ fn dct_1d(vec: &[f64]) -> Vec<f64> {
 
         for x in range(0, vec.len()) {
             z += vec[x] * (PI * u as f64 * (2 * x + 1) as f64 
-                           / (2 * vec.len()) as f64).cos(); 
+                / (2 * vec.len()) as f64).cos(); 
         }
 
         if u == 0 {
@@ -101,7 +101,7 @@ pub fn crop_dct(dct: Vec<f64>, original: (uint, uint), new: (uint, uint))
         let start = y * orig_width;
         let end = start + new_width;
 
-        out = out.append(dct.slice(start, end));
+        out.push_all(dct.slice(start, end));
     }
 
     out

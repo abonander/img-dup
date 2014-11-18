@@ -47,7 +47,7 @@ impl ImageHash {
         let mean = hash_values.iter().fold(0u, |b, &a| a as uint + b) 
             / hash_sq;
 
-        hash_values.move_iter().map(|x| x as uint >= mean).collect()
+        hash_values.into_iter().map(|x| x as uint >= mean).collect()
     }
 
     fn dct_hash(img: &DynamicImage, hash_size: u32) -> Bitv {
@@ -72,7 +72,7 @@ impl ImageHash {
         let mean = cropped_dct.iter().fold(0f64, |b, &a| a + b) 
             / (hash_size * hash_size) as f64;
 
-        cropped_dct.move_iter().map(|x| x >= mean).collect()
+        cropped_dct.into_iter().map(|x| x >= mean).collect()
     }    
 
     pub fn hash(img: &DynamicImage, hash_size: u32, fast: bool) -> ImageHash {
