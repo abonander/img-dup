@@ -1,8 +1,9 @@
-#![feature(macro_rules)]
+#![feature(macro_rules, unsafe_destructor)]
 
 extern crate getopts;
 extern crate image;
 extern crate img_hash;
+extern crate rustrt;
 extern crate serialize;
 extern crate time;
 
@@ -27,6 +28,7 @@ mod config;
 mod img;
 mod output;
 mod processing;
+mod par_queue;
 
 fn main() {
     let args = os::args();

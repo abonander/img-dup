@@ -1,6 +1,6 @@
 use getopts::{OptGroup, optopt, optmulti, optflag, optflagopt, Matches, usage, getopts};
 
-use serialize::json::{ToJson, Json, Object};
+use serialize::json::{ToJson, Json};
 
 use std::collections::TreeMap;
 
@@ -98,7 +98,7 @@ impl Show for ProgramSettings {
         try!(writeln!(fmt, "Recursive: {}", self.recurse));
         try!(writeln!(fmt, "Extensions: {}", self.exts.as_slice()));
         try!(writeln!(fmt, "Hash size: {}", self.hash_size));
-        try!(writeln!(fmt, "Threshold: {0:.2f}%", self.threshold * 100f32));
+        try!(writeln!(fmt, "Threshold: {0:.2}%", self.threshold * 100f32));
         writeln!(fmt, "Fast: {}", self.fast)
     }
 }
@@ -116,7 +116,7 @@ impl ToJson for ProgramSettings {
         json_insert!(my_json, "fast", self.fast);
         json_insert!(my_json, "limit", self.limit);
 
-        Object(my_json)
+        Json::Object(my_json)
     }
 }
 
@@ -150,7 +150,7 @@ pub fn parse_args(args: &[String]) -> ProgramSettings {
 
     let exts_default = vec!("jpeg", "jpg", "png");
 
-    let dir = dir_arg(opts, "dir", os::getcwd());
+    let dir = dir_arg(opts, "dir", os::getcwd().unwrap());
 
     ProgramSettings {
         threads: uint_arg(opts, "threads", os::num_cpus()),

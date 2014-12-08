@@ -1,6 +1,6 @@
 use img_hash::ImageHash;
 
-use serialize::json::{Json, ToJson, Object};
+use serialize::json::{Json, ToJson};
 
 use std::collections::TreeMap;
 use std::io::IoResult;
@@ -95,7 +95,7 @@ impl UniqueImage {
 
         json_insert!(json, "similars", similars_json);
 
-        Object(json)
+        Json::Object(json)
     }
 }
 
@@ -116,7 +116,7 @@ impl SimilarImage {
     }
 
     fn write_self(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
-        writeln!(out, "[{0:.2f}%] ({1}x{2}) {3}",
+        writeln!(out, "[{0:.2}%] ({1}x{2}) {3}",
             self.dist_ratio * 100f32,
             self.img.width, self.img.height,
             self.img.relative_path(relative_to).display()
@@ -128,7 +128,7 @@ impl SimilarImage {
 
         json_insert!(json, "diff", self.dist_ratio);
 
-        Object(json)
+        Json::Object(json)
     }
 }
 

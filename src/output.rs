@@ -4,7 +4,7 @@ use processing::Results;
 use serialize::Encodable;
 
 use serialize::json::Encoder as JsonEncoder;
-use serialize::json::{Json, ToJson, Object, PrettyEncoder};
+use serialize::json::{Json, PrettyEncoder, ToJson};
 
 use std::collections::TreeMap;
 
@@ -39,7 +39,7 @@ fn json_output(settings: &ProgramSettings, results: &Results, out: &mut Writer) 
         json_insert!(json, "images", results.uniques_json(dir, settings.dup_only));
         json_insert!(json, "errors", results.errors_json(dir));
 
-        Object(json)
+        Json::Object(json)
     };
 
     try!(json_encode(&settings.json, output, out));
@@ -58,7 +58,7 @@ fn json_encode(json_config: &JsonSettings, json: Json, out: &mut Writer) -> IoRe
             let ref mut encoder = JsonEncoder::new(out);
             json.encode(encoder)
         },
-        JsonSettings::NoJson => Ok(()),
+        JsonSettings::NoJson => return Ok(()),
     }
 }
 
