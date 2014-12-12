@@ -85,8 +85,13 @@ in `img-dup`'s directory.
 License
 =======
 
+This software is GPL-licensed, with several MIT-licensed dependencies.
+
 Please see `LICENSE.md` in this repository.
 
-This project uses [PistonDevelopers/rust-image][1], which is MIT-licensed. According to Wikipedia, it is safe to use MIT-licensed software in this project.
+GPL-Licensed Font
+=================
+This program uses the GPL-licensed `FreeSerif.otf` font, copied, unmodified, from the [GNU Freefont][1] distribution.
+Since this program is GPL, it is free to include GPL-licensed fonts.
 
-[1]: https://github.com/PistonDevelopers/rust-image
+[1]: https://www.gnu.org/software/freefont/index.html
