@@ -1,14 +1,43 @@
+use conrod::*;
+use event::{Event, Events, Ups, MaxFps, WindowSettings};
 use opengl_graphics::OpenGL;
-
 use sdl2_window::Window;
 
 use config::ProgramSettings;
 
-fn show_setup_ui(settings: ProgramSettings) {	
+fn show_setup_ui(settings: ProgramSettings) {
+	const GL_VER: OpenGL = OpenGL::_3_2;
+	
 	let ref mut state = ConfigState::from_settings(settings);
 
+	let window = Window::new(GL_VER, WindowSettings {
+		title: "img-dup configuration".into_string(),
+		width: 640,
+		height: 480,
+		fullscreen: false,
+		exit_on_esc: false,
+		samples: 4,
+	});
 	
-	  
+	let mut events = Events::new(window).set(Ups(120)).set(MaxFps(60));
+	let mut gl = Gl::new(GL_VER);
+
+	let theme = Theme::default();
+	let font = GlyphCache::new(&super::font()).unwrap();
+	
+	let ref mut uic = UiContext::new(font, theme);
+
+	for event in events {
+		uic.handle_event(&event);
+		match event {
+			Event::Render(args) => {
+				gl.draw([0, 0, args.width as u32, args.height as u32], |_, gl| {
+					draw_setup_dialog(gl, uic, state);				
+				});
+			}
+			_ => (),
+		}
+	}
 }
 
 struct ConfigState {
@@ -53,5 +82,15 @@ struct Buffers {
 }
 
 fn draw_setup_dialog(gl: &mut Gl, uic: &mut UiContext, state: &mut ConfigState) {
+	const DIR: u64 = 1;
+	
+	uic.text_box(DIR, state.buffers.dir)
+		.position(5.0, 30.0)
+		.dimensions(140.0, 20.0)
+		.callback(|dir| state.set_dir(dir))
+		.draw(gl);
 		
+	uic.label("Search Directory")
+		.up_from(DIR, 5.0)
+		.draw(gl);
 }

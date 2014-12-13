@@ -1,4 +1,4 @@
-#![feature(macro_rules)]
+#![feature(macro_rules, glops)]
 
 extern crate getopts;
 extern crate image;
@@ -27,11 +27,17 @@ mod config;
 mod img;
 mod output;
 mod processing;
+mod ui;
 
 fn main() {
     let args = os::args();
 
     let settings = parse_args(args.as_slice());
+
+	if settings.gui {
+		ui::show_gui(settings);
+		return;
+	}
 
     // Silence standard messages if we're outputting JSON
     let mut out = get_output(&settings);    

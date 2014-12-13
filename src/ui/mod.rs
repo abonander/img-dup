@@ -19,7 +19,7 @@ mod setup;
 mod running;
 mod results;
 
-fn show_ui(settings: ProgramSettings) {
+fn show_gui(settings: ProgramSettings) {
 	setup::show_setup_ui(settings);				
 }
 

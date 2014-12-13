@@ -11,8 +11,9 @@ git = "https://github.com/rust-lang/time.git"
 git = "https://github.com/cybergeek94/img_hash.git"
 
 [dependencies.conrod]
-git = "https://github.com/PistonDevelopers/conrod"
+git = "https://github.com/cybergeek94/conrod"
 
-[dependencies.sdl2_window]
+[dependencies.pistoncore-sdl2_window]
 git = "https://github.com/PistonDevelopers/sdl2_window"
+
 

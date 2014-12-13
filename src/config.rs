@@ -24,6 +24,7 @@ pub struct ProgramSettings {
     pub dup_only: bool,
     pub limit: uint,
     pub json: JsonSettings,
+	pub gui: bool,
 }
 
 impl ProgramSettings {
@@ -76,6 +77,9 @@ impl ProgramSettings {
                        Otherwise, the JSON will be in compact format.
                        See the README for details.",
                        "[1+] (optional)"),
+			optflag("g", "gui",
+				"Open the GUI. Given command-line flags will be set
+				in the configuration dialog."),
         )
     }
 
@@ -164,6 +168,7 @@ pub fn parse_args(args: &[String]) -> ProgramSettings {
         dup_only: opts.opt_present("dup-only"),
         limit: uint_arg(opts, "limit", 0),
         json: json_arg(opts, "json", JsonSettings::NoJson),
+		gui: opts.opt_present("gui"), 
     }    
 }
 
