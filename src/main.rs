@@ -1,9 +1,15 @@
 #![feature(macro_rules, globs, unsafe_destructor)]
 
+extern crate conrod;
+extern crate current;
+extern crate event;
+extern crate file_dialog;
 extern crate getopts;
 extern crate image;
 extern crate img_hash;
+extern crate opengl_graphics;
 extern crate rustrt;
+extern crate sdl2_window;
 extern crate serialize;
 extern crate time;
 
@@ -28,11 +34,8 @@ mod config;
 mod img;
 mod output;
 mod processing;
-<<<<<<< HEAD
 mod ui;
-=======
 mod par_queue;
->>>>>>> master
 
 fn main() {
     let args = os::args();

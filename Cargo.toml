@@ -5,13 +5,16 @@ version = "0.3.0"
 authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
 [dependencies.time]
-git = "https://github.com/rust-lang/time.git"
+git = "https://github.com/rust-lang/time"
+
+[dependencies.file_dialog]
+git = "https://github.com/cybergeek94/file_dialog"
 
 [dependencies.img_hash]
-git = "https://github.com/cybergeek94/img_hash.git"
+git = "https://github.com/cybergeek94/img_hash"
 
 [dependencies.conrod]
-git = "https://github.com/cybergeek94/conrod"
+git = "https://github.com/PistonDevelopers/conrod"
 
 [dependencies.pistoncore-sdl2_window]
 git = "https://github.com/PistonDevelopers/sdl2_window"
