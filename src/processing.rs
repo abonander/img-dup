@@ -1,22 +1,22 @@
 use config::{ProgramSettings, HashSettings};
 use img::{Image, UniqueImage};
 use output::newline_before_after;
+use par_queue::ParQueue;
 
 use image;
 use image::{DynamicImage, GenericImage, ImageError};
 
 use img_hash::ImageHash;
 
-use serialize::json::{ToJson, Json, Object, List};
+use rustrt::unwind::try;
+ 
+use serialize::json::{ToJson, Json};
+
 use time::{Tm, now};
 
 use std::boxed::BoxAny;
 use std::collections::TreeMap;
 use std::io::IoResult;
-use std::rt::unwind::try;
-use std::sync::Future;
-use std::sync::deque::{BufferPool, Data, Empty};
-use std::task::deschedule;
 
 #[deriving(Send)]
 pub struct Results {
@@ -45,7 +45,7 @@ impl Results {
         json_insert!(info, "processed", self.uniques.len());
         json_insert!(info, "errors", self.errors.len());
 
-        Object(info)
+        Json::Object(info)
     }
 
     pub fn uniques_json(&self, relative_to: &Path, dup_only: bool) -> Json {
@@ -58,7 +58,7 @@ impl Results {
                 }  
         ).collect();
 
-        List(uniques_json)
+        Json::Array(uniques_json)
     }
 
     pub fn errors_json(&self, relative_to: &Path) -> Json {
@@ -66,7 +66,7 @@ impl Results {
             .map( |error| error.to_json(relative_to) )
             .collect();
 
-        List(errors_json)        
+        Json::Array(errors_json)        
     }
 
     pub fn write_info(&self, out: &mut Writer) -> IoResult<()> {
@@ -134,7 +134,7 @@ impl ProcessingError {
         json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
         json_insert!(json, "error", self.err_msg());
 
-        Object(json)        
+        Json::Object(json)        
     }
 
     pub fn write_self(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
@@ -146,13 +146,6 @@ pub type ImageResult = Result<Image, ProcessingError>;
 
 pub type Total = uint;
 
-#[allow(dead_code)]
-pub fn process_future(settings: ProgramSettings, paths: Vec<Path>) -> Future<(ProgramSettings, Results)> { 
-    Future::spawn(proc() {
-        let results = process(&settings, paths);
-        (settings, results)
-    } )    
-}
 
 pub fn process(settings: &ProgramSettings, paths: Vec<Path>) -> Results {
     let start_time = now();
@@ -177,36 +170,22 @@ fn process_multithread(settings: &ProgramSettings, paths: Vec<Path>)
 
 fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>) 
     -> Receiver<ImageResult> {
-    let buffer: BufferPool<Path> = BufferPool::new();   
-    let (worker, stealer) = buffer.deque();
-
-    for path in paths.into_iter() {
-        worker.push(path);
-    }
+    
+    let work = ParQueue::from_vec(paths).into_iter();
 
     let (tx, rx) = channel();
 
     let hash_settings = settings.hash_settings();
 
     for _ in range(0, settings.threads) {
-        let task_stealer = stealer.clone();
         let task_tx = tx.clone();
+        let mut task_work = work.clone(); 
 
         spawn(proc() {            
-            loop {
-                match task_stealer.steal() {
-                    Data(path) => {
-                        let img_result = load_and_hash_image(&hash_settings, path);
+            for path in task_work {
+                let img_result = load_and_hash_image(&hash_settings, path);
                                                 
-                        if task_tx.send_opt(img_result).is_err() { 
-                            break;    
-                        }
-                    },
-                    Empty => break,
-                    _ => (),
-                };
-               
-                deschedule();
+                if task_tx.send_opt(img_result).is_err() { break; }
             }
         });
     }
@@ -259,8 +238,6 @@ fn receive_images(rx: Receiver<ImageResult>, settings: &ProgramSettings)
             },
             Err(img_err) => errors.push(img_err),
         }                
-       
-        deschedule();
     }
 
     (total, unique_images, errors)
@@ -279,3 +256,4 @@ fn manage_images(images: &mut Vec<UniqueImage>,
         None => images.push(UniqueImage::from_image(image)),
     }
 }
+
