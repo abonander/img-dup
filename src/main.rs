@@ -17,9 +17,6 @@ use config::{parse_args, ProgramSettings};
 use output::{output_results, test_outfile};
 use processing::process;
 
-use std::ascii::AsciiExt;
-
-use std::io::fs::{mod, PathExtensions};
 use std::io::util::NullWriter;
 
 use std::os;
@@ -61,9 +58,7 @@ fn main() {
     
     out.write_line("Searching for images...").unwrap();
 
-    let mut image_paths = find_images(&settings.dir, 
-                                      settings.exts.as_slice(), 
-                                      settings.recurse);
+    let mut image_paths = processing::find_images(&settings);
 
     let image_count = image_paths.len();
 
@@ -82,30 +77,6 @@ fn main() {
     out.write_line("").unwrap();
 
     output::output_results(&settings, &results).unwrap()   
-}
-
-fn find_images(dir: &Path, exts: &[String], recurse: bool) -> Vec<Path> {
-    let exts: Vec<&str> = exts.iter().map(|string| string.as_slice()).collect();
-
-    if recurse {
-        fs::walk_dir(dir)
-            .unwrap()
-            .filter( |file| check_ext(file, exts.as_slice()) )
-            .collect()   
-    } else {
-        fs::readdir(dir)
-            .unwrap()
-            .into_iter()
-            .filter( |file| !file.is_dir() && check_ext(file, exts.as_slice()) )
-            .collect()
-    } 
-}
-
-fn check_ext<'a>(file: &'a Path, exts: &'a [&'a str]) -> bool {   
-    match file.extension_str() {
-        Some(ext) => exts.iter().any(|&a| a.eq_ignore_ascii_case(ext)),
-        None => false
-    }
 }
 
 fn get_output(settings: &ProgramSettings) -> Box<Writer> {

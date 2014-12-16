@@ -1,35 +1,14 @@
-use conrod::*;
-use current::Set;
-use event::{Event, Events, Ups, MaxFps, WindowSettings};
-use opengl_graphics::{Gl, OpenGL};
-use opengl_graphics::glyph_cache::GlyphCache;
-use sdl2_window::Sdl2Window;
+use ui::prelude::*;
 
 use config::ProgramSettings;
 
 use std::default::Default;
 
-pub fn show_setup_ui(settings: ProgramSettings) -> Option<ProgramSettings> {
-	const GL_VER: OpenGL = OpenGL::_3_2;
-	
+pub fn show_setup_ui(settings: ProgramSettings) -> Option<ProgramSettings> {	
 	let (mut state, mut buf) = ConfigState::from_settings(settings);
 
-	let window = Sdl2Window::new(GL_VER, WindowSettings {
-		title: "img-dup configuration".into_string(),
-		size: [640, 480],
-		fullscreen: false,
-		exit_on_esc: false,
-		samples: 4,
-	});
-	
-	let mut events = Events::new(window).set(Ups(120)).set(MaxFps(60));
-	let mut gl = Gl::new(GL_VER);
-
-	let theme = Theme::default();
-	let font = GlyphCache::new(&super::font()).unwrap();
-	
-	let ref mut uic = UiContext::new(font, theme);
-
+	let (mut uic, mut gl, mut events) = create_window("img-dup configuration", [640, 480]);
+		
 	for event in events {
         if state.canceled { break; }
         else if state.confirmed { return Some(state.settings); }
@@ -38,7 +17,7 @@ pub fn show_setup_ui(settings: ProgramSettings) -> Option<ProgramSettings> {
 		match event {
 			Event::Render(args) => {
 				gl.draw([0, 0, args.width as i32, args.height as i32], |_, gl| {
-					draw_setup_dialog(gl, uic, &mut state, &mut buf);				
+					draw_setup_dialog(gl, &mut uic, &mut state, &mut buf);				
 				});
 			}
 			_ => (),
@@ -145,7 +124,7 @@ impl Buffers {
 }
 
 fn draw_setup_dialog(gl: &mut Gl, uic: &mut UiContext, state: &mut ConfigState, buf: &mut Buffers) {
-    uic.background().color(Color([0.9, 0.9, 0.9, 1.0])).draw(gl);
+    background(gl, uic);
 	
     const DIR: u64 = 1;
 	uic.text_box(DIR, &mut buf.dir)

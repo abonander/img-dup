@@ -124,6 +124,7 @@ impl ToJson for ProgramSettings {
     }
 }
 
+#[deriving(Copy)]
 pub struct HashSettings {
     pub hash_size: u32,
     pub fast: bool,
