@@ -7,6 +7,7 @@ extern crate file_dialog;
 extern crate getopts;
 extern crate image;
 extern crate img_hash;
+extern crate libc;
 extern crate opengl_graphics;
 extern crate rustrt;
 extern crate sdl2_window;
@@ -19,6 +20,7 @@ use processing::process;
 
 use std::io::util::NullWriter;
 
+use std::intrinsics;
 use std::os;
 
 macro_rules! json_insert(
@@ -34,7 +36,16 @@ mod processing;
 mod ui;
 mod par_queue;
 
+
 fn main() {
+    run();
+
+    // Exit immediately, don't leave any threads alive
+    unsafe { libc::exit(0); }   
+}
+
+
+fn run() {
     let args = os::args();
 
     let settings = parse_args(args.as_slice());
