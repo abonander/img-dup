@@ -5,7 +5,7 @@ use super::util::FormatBytes;
 use img::UniqueImage;
 use processing::{mod, TimedImageResult, ProcessingError, Total};
 
-use graphics::{Context, Image, Rect};
+use graphics::{mod,BackEnd, Context, Image, Rect};
 use opengl_graphics::Texture;
 
 use image::{
@@ -81,7 +81,7 @@ impl ResultsState {
     fn new(mut done: IntoIter<UniqueImage>) -> Option<ResultsState> {
         match done.next() {
             Some(current) => {
-                let next = done.next();
+                let next = None; //done.next();
                 let buf = Buffers::create(&current, next.as_ref());
             
                 Some(
@@ -132,10 +132,10 @@ impl Buffers {
         Buffers {
             current: ImageBuf::open(&current.img.path).unwrap(),
             preview_next: next.map(|img| ImageBuf::open(&img.img.path).unwrap()),
-            compares: current.similars
+            compares: Vec::new(), /*current.similars
                 .iter()
                 .map(|similar| ImageBuf::open(&similar.img.path).unwrap())
-                .collect(),
+                .collect(),*/
         }            
     }    
 }
@@ -145,20 +145,9 @@ fn draw_results_ui(
     uic: &mut UiContext, 
     state: &mut ResultsState, consts: &Constants
 ) {
-    background(gl, uic);
-
-    state.buf.current.draw([0.0, 0.0, 1024.0, 768.0], gl, ctx);
-
-    if let Some(ref next) = state.buf.preview_next {
-        uic.label("Next Image: ")
-            .position(5.0, 150.0)
-            .size(18)
-            .draw(gl);
-
-        next.draw([150.0, 150.0, 450.0, 450.0], gl, ctx);
-    } 
-}
-
+    //background(gl, uic);
+    state.buf.current.draw(gl, ctx);
+} 
 struct ImageBuf {
     image: Texture,
     name: String,
@@ -174,6 +163,8 @@ impl ImageBuf {
         let file_size = try!(fs::stat(path)).size;
 
         let size = format!("{} x {} ({})", width, height, FormatBytes(file_size));
+
+        debug!("Name: {} Size: {}", name, size);
  
         let tex = Texture::from_image(&image.to_rgba());
          
@@ -184,8 +175,7 @@ impl ImageBuf {
         })
     }
 
-    fn draw(&self, rect: [f64; 4], gl: &mut Gl, ctx: &Context) {
-        Image::new()
-            .draw(&self.image, ctx, gl);             
+    fn draw(&self, gl: &mut Gl, ctx: &Context) {
+        graphics::image(&self.image, ctx, gl);             
     }  
 }
