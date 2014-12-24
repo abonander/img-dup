@@ -225,8 +225,7 @@ fn draw_running_dialog(gl: &mut Gl, uic: &mut UiContext, buf: &mut Buffers) {
         .label(match buf.stop {
             0 => "Stop",
             1 => "Really?",
-            2 => "Stopping",
-            _ => unreachable!(),
+            _ => "Stopping",
         })
         .label_font_size(18)
         .callback(|| buf.stop += 1)

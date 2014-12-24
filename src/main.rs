@@ -1,4 +1,4 @@
-#![feature(macro_rules, globs, unsafe_destructor)]
+#![feature(macro_rules, globs, unsafe_destructor, phase)]
 
 extern crate conrod;
 extern crate current;
@@ -9,6 +9,7 @@ extern crate getopts;
 extern crate image;
 extern crate img_hash;
 extern crate libc;
+#[phase(plugin, link)] extern crate log;
 extern crate opengl_graphics;
 extern crate sdl2_window;
 extern crate serialize;

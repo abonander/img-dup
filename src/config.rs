@@ -11,7 +11,7 @@ use std::io::fs::PathExtensions;
 
 use std::os;
 
-#[deriving(Send)]
+#[deriving(Send, Clone)]
 pub struct ProgramSettings {
     pub threads: uint,
     pub dir: Path,
@@ -130,7 +130,7 @@ pub struct HashSettings {
     pub fast: bool,
 }
 
-#[deriving(PartialEq, Eq)]
+#[deriving(PartialEq, Eq, Copy, Clone)]
 pub enum JsonSettings {
     NoJson,
     CompactJson,

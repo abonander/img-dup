@@ -4,9 +4,10 @@ use serialize::json::{Json, ToJson};
 
 use std::collections::BTreeMap;
 use std::io::IoResult;
+use std::mem;
 use std::path::Path;
 
-#[deriving(Clone)]
+#[deriving(Eq, PartialEq, Clone)]
 pub struct Image {
     pub path: Path,
     pub hash: ImageHash,
@@ -67,7 +68,7 @@ impl UniqueImage {
 
     pub fn similars(&self) -> Vec<SimilarImage> {
         let mut temp = self.similars.clone();
-        temp.sort_by(|a, b| a.dist_ratio.partial_cmp(&b.dist_ratio).unwrap());
+        temp.sort();
         temp    
     }
 
@@ -97,9 +98,19 @@ impl UniqueImage {
 
         Json::Object(json)
     }
+
+    pub fn promote(&mut self, idx: uint) {
+        mem::swap(&mut self.similars[idx].img, &mut self.img);
+        for similar in self.similars.iter_mut() {
+            let dist_ratio = self.img.hash.dist_ratio(&similar.img.hash);
+            similar.dist_ratio = dist_ratio;
+        }
+        
+        self.similars.sort()
+    } 
 }
 
-#[deriving(Clone)]
+#[deriving(PartialEq, Clone)]
 pub struct SimilarImage {
    pub img: Image, 
    // Distance from the containing UniqueImage
@@ -131,4 +142,18 @@ impl SimilarImage {
         Json::Object(json)
     }
 }
+
+impl Ord for SimilarImage {
+    fn cmp(&self, other: &SimilarImage) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Equal)   
+    }
+}
+
+impl PartialOrd for SimilarImage {
+    fn partial_cmp(&self, other: &SimilarImage) -> Option<Ordering> {
+        self.dist_ratio.partial_cmp(&other.dist_ratio)                    
+    }    
+}
+
+impl Eq for SimilarImage {}
 
