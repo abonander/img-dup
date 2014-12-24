@@ -49,8 +49,8 @@ fn results_window(mut state: ResultsState, consts: &Constants) -> bool {
 
 		match event {
 			Event::Render(args) => {
-				gl.draw([0, 0, args.width as i32, args.height as i32], |_, gl| {
-					draw_results_ui(gl, &mut uic, &mut state, consts);				
+				gl.draw([0, 0, args.width as i32, args.height as i32], |ctx, gl| {
+					draw_results_ui(gl, &ctx, &mut uic, &mut state, consts);				
 				});
 			}
 			_ => (),
@@ -140,8 +140,14 @@ impl Buffers {
     }    
 }
 
-fn draw_results_ui(gl: &mut Gl, uic: &mut UiContext, state: &mut ResultsState, consts: &Constants) {
+fn draw_results_ui(
+    gl: &mut Gl, ctx: &Context, 
+    uic: &mut UiContext, 
+    state: &mut ResultsState, consts: &Constants
+) {
     background(gl, uic);
+
+    state.buf.current.draw([0.0, 0.0, 1024.0, 768.0], gl, ctx);
 
     if let Some(ref next) = state.buf.preview_next {
         uic.label("Next Image: ")
@@ -149,7 +155,7 @@ fn draw_results_ui(gl: &mut Gl, uic: &mut UiContext, state: &mut ResultsState, c
             .size(18)
             .draw(gl);
 
-        next.draw([150.0, 150.0, 450.0, 450.0], gl);
+        next.draw([150.0, 150.0, 450.0, 450.0], gl, ctx);
     } 
 }
 
@@ -167,20 +173,19 @@ impl ImageBuf {
         let (width, height) = image.dimensions();
         let file_size = try!(fs::stat(path)).size;
 
-        let size = format!("{} x {} ({})", width, height, file_size);
-        
-        let text = Texture::from_image(&image.to_rgba());
+        let size = format!("{} x {} ({})", width, height, FormatBytes(file_size));
+ 
+        let tex = Texture::from_image(&image.to_rgba());
          
         Ok(ImageBuf {
-                image: Texture::from_image(&image.to_rgba()),
+                image: tex,
                 name: name,
                 size: size,
         })
     }
 
-    fn draw(&self, rect: [f64; 4], gl: &mut Gl) {
-        Image::colored([0.0, 0.0, 0.0, 1.0])
-            .set(Rect(rect))
-            .draw(&self.image, &Context::new(), gl);             
+    fn draw(&self, rect: [f64; 4], gl: &mut Gl, ctx: &Context) {
+        Image::new()
+            .draw(&self.image, ctx, gl);             
     }  
 }

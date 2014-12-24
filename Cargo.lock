@@ -12,13 +12,13 @@ dependencies = [
 [[package]]
 name = "conrod"
 version = "0.0.0"
-source = "git+https://github.com/PistonDevelopers/conrod#05c31c40ffcca56073f37ca13e1c3792c4df1a97"
+source = "git+https://github.com/PistonDevelopers/conrod#627bdc96f2a5f43dd679c013a38fe4f04b97be20"
 dependencies = [
  "freetype-rs 0.0.1 (git+https://github.com/PistonDevelopers/freetype-rs.git)",
  "piston2d-graphics 0.0.1 (git+https://github.com/PistonDevelopers/graphics.git)",
  "piston2d-opengl_graphics 0.0.0 (git+https://github.com/PistonDevelopers/opengl_graphics.git)",
  "pistoncore-event 0.0.1 (git+https://github.com/PistonDevelopers/event)",
- "pistoncore-input 0.0.3 (git+https://github.com/PistonDevelopers/input/)",
+ "pistoncore-input 0.0.3 (git+https://github.com/pistondevelopers/input)",
  "vecmath 0.0.1 (git+https://github.com/PistonDevelopers/vecmath.git)",
 ]
 
@@ -103,25 +103,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "log"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "regex 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "piston-texture"
 version = "0.0.1"
-source = "git+https://github.com/PistonDevelopers/texture#0380876cec71e384841d5a06ad32cb462c97be20"
+source = "git+https://github.com/pistondevelopers/texture#0380876cec71e384841d5a06ad32cb462c97be20"
 
 [[package]]
 name = "piston2d-graphics"
 version = "0.0.1"
 source = "git+https://github.com/PistonDevelopers/graphics.git#392274b44ccf40b9c2239c31bc76c34bc874d007"
 dependencies = [
- "piston-texture 0.0.1 (git+https://github.com/PistonDevelopers/texture)",
- "pistoncore-current 0.0.3 (git+https://github.com/PistonDevelopers/current)",
+ "piston-texture 0.0.1 (git+https://github.com/pistondevelopers/texture)",
+ "pistoncore-current 0.0.3 (git+https://github.com/pistondevelopers/current)",
  "read_color 0.0.1 (git+https://github.com/PistonDevelopers/read_color)",
  "vecmath 0.0.1 (git+https://github.com/PistonDevelopers/vecmath.git)",
 ]
@@ -134,7 +126,7 @@ dependencies = [
  "freetype-rs 0.0.1 (git+https://github.com/PistonDevelopers/freetype-rs.git)",
  "gl 0.0.2 (git+https://github.com/bjz/gl-rs)",
  "image 0.2.0-alpha.4 (git+https://github.com/PistonDevelopers/image.git)",
- "piston-texture 0.0.1 (git+https://github.com/PistonDevelopers/texture)",
+ "piston-texture 0.0.1 (git+https://github.com/pistondevelopers/texture)",
  "piston2d-graphics 0.0.1 (git+https://github.com/PistonDevelopers/graphics.git)",
  "shader_version 0.0.0 (git+https://github.com/pistondevelopers/shader_version)",
 ]
@@ -142,34 +134,34 @@ dependencies = [
 [[package]]
 name = "pistoncore-current"
 version = "0.0.3"
-source = "git+https://github.com/PistonDevelopers/current#a85a8b548384bc66842cb6caaee575613ef3d950"
+source = "git+https://github.com/pistondevelopers/current#a85a8b548384bc66842cb6caaee575613ef3d950"
 
 [[package]]
 name = "pistoncore-event"
 version = "0.0.1"
 source = "git+https://github.com/PistonDevelopers/event#8da3cbbd3764d8aa9ba3fbf4ccacc60069471b76"
 dependencies = [
- "pistoncore-current 0.0.3 (git+https://github.com/PistonDevelopers/current)",
- "pistoncore-event_loop 0.0.2 (git+https://github.com/PistonDevelopers/event_loop)",
- "pistoncore-input 0.0.3 (git+https://github.com/PistonDevelopers/input/)",
- "pistoncore-window 0.0.1 (git+https://github.com/PistonDevelopers/window)",
+ "pistoncore-current 0.0.3 (git+https://github.com/pistondevelopers/current)",
+ "pistoncore-event_loop 0.0.2 (git+https://github.com/pistondevelopers/event_loop)",
+ "pistoncore-input 0.0.3 (git+https://github.com/pistondevelopers/input)",
+ "pistoncore-window 0.0.1 (git+https://github.com/pistondevelopers/window)",
 ]
 
 [[package]]
 name = "pistoncore-event_loop"
 version = "0.0.2"
-source = "git+https://github.com/PistonDevelopers/event_loop#98cd324f4b7448458928763e80db2ed44a26ea6e"
+source = "git+https://github.com/pistondevelopers/event_loop#98cd324f4b7448458928763e80db2ed44a26ea6e"
 dependencies = [
- "pistoncore-current 0.0.3 (git+https://github.com/PistonDevelopers/current)",
+ "pistoncore-current 0.0.3 (git+https://github.com/pistondevelopers/current)",
  "time 0.1.4 (git+https://github.com/rust-lang/time)",
 ]
 
 [[package]]
 name = "pistoncore-input"
 version = "0.0.3"
-source = "git+https://github.com/PistonDevelopers/input/#7d5b3ee529875ee3241ab53da9c4d65f0988ec3e"
+source = "git+https://github.com/pistondevelopers/input#7d5b3ee529875ee3241ab53da9c4d65f0988ec3e"
 dependencies = [
- "rustc-serialize 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-serialize 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -178,8 +170,8 @@ version = "0.0.0"
 source = "git+https://github.com/PistonDevelopers/sdl2_window#c484f13b4a7b071c9090d4c8fcfacf8ca529e017"
 dependencies = [
  "gl 0.0.2 (git+https://github.com/bjz/gl-rs)",
- "pistoncore-input 0.0.3 (git+https://github.com/PistonDevelopers/input/)",
- "pistoncore-window 0.0.1 (git+https://github.com/PistonDevelopers/window)",
+ "pistoncore-input 0.0.3 (git+https://github.com/pistondevelopers/input)",
+ "pistoncore-window 0.0.1 (git+https://github.com/pistondevelopers/window)",
  "sdl2 0.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "shader_version 0.0.0 (git+https://github.com/pistondevelopers/shader_version)",
 ]
@@ -187,11 +179,11 @@ dependencies = [
 [[package]]
 name = "pistoncore-window"
 version = "0.0.1"
-source = "git+https://github.com/PistonDevelopers/window#9e281b62aa3292d9554044ee846264783e3212da"
+source = "git+https://github.com/pistondevelopers/window#9e281b62aa3292d9554044ee846264783e3212da"
 dependencies = [
- "pistoncore-current 0.0.3 (git+https://github.com/PistonDevelopers/current)",
- "pistoncore-event_loop 0.0.2 (git+https://github.com/PistonDevelopers/event_loop)",
- "pistoncore-input 0.0.3 (git+https://github.com/PistonDevelopers/input/)",
+ "pistoncore-current 0.0.3 (git+https://github.com/pistondevelopers/current)",
+ "pistoncore-event_loop 0.0.2 (git+https://github.com/pistondevelopers/event_loop)",
+ "pistoncore-input 0.0.3 (git+https://github.com/pistondevelopers/input)",
 ]
 
 [[package]]
@@ -205,13 +197,8 @@ version = "0.0.1"
 source = "git+https://github.com/PistonDevelopers/read_color#3341ae05529048810206377310048403e13de3a4"
 
 [[package]]
-name = "regex"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
 name = "rustc-serialize"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -227,11 +214,10 @@ source = "git+https://github.com/pistondevelopers/shader_version#d06e44721e837d0
 [[package]]
 name = "time"
 version = "0.1.4"
-source = "git+https://github.com/rust-lang/time#11636ff02b44f73dc32cc10edb27af19051291fc"
+source = "git+https://github.com/rust-lang/time#67fb5a7f81b910379ba6144132edf9e54e40291b"
 dependencies = [
  "gcc 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustc-serialize 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-serialize 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

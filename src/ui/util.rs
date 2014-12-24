@@ -4,7 +4,7 @@ use std::fmt::Error as FmtError;
 use std::io::IoResult;
 
 #[deriving(Copy)]
-pub struct FormatBytes(u64);
+pub struct FormatBytes(pub u64);
 
 impl FormatBytes { 
     #[inline]
