@@ -2,7 +2,7 @@ use img_hash::ImageHash;
 
 use serialize::json::{Json, ToJson};
 
-use std::collections::TreeMap;
+use std::collections::BTreeMap;
 use std::io::IoResult;
 use std::path::Path;
 
@@ -29,8 +29,8 @@ impl Image {
         self.path.path_relative_from(relative_to).unwrap_or(self.path.clone())
     }
 
-    pub fn to_treemap(&self, relative_to: &Path) -> TreeMap<String, Json> {
-        let mut json = TreeMap::new();
+    pub fn to_treemap(&self, relative_to: &Path) -> BTreeMap<String, Json> {
+        let mut json = BTreeMap::new();
 
         json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
         json_insert!(json, "hash", self.hash.to_base64());

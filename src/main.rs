@@ -4,12 +4,12 @@ extern crate conrod;
 extern crate current;
 extern crate event;
 extern crate file_dialog;
+extern crate graphics;
 extern crate getopts;
 extern crate image;
 extern crate img_hash;
 extern crate libc;
 extern crate opengl_graphics;
-extern crate rustrt;
 extern crate sdl2_window;
 extern crate serialize;
 extern crate time;
@@ -27,7 +27,7 @@ macro_rules! json_insert(
     ($map:expr, $key:expr, $val:expr) => (
         $map.insert($key.into_string(), $val.to_json())
     );
-)
+);
 
 mod config;
 mod img;
@@ -36,14 +36,12 @@ mod processing;
 mod ui;
 mod par_queue;
 
-
 fn main() {
     run();
 
     // Exit immediately, don't leave any threads alive
     unsafe { libc::exit(0); }   
 }
-
 
 fn run() {
     let args = os::args();

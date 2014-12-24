@@ -8,16 +8,18 @@ macro_rules! write_str(
 			(write!(vec, $fmt, $($args),+)).unwrap();
 		}
 	)
-)
+);
 
 mod setup;
 mod running;
 mod results;
+mod util;
 
 pub fn show_gui(settings: ProgramSettings) {
-	if let Some(results) = setup::show_setup_ui(settings).map(running::start_processing) {
-            results::show_results(results)
-    }
+	while setup::show_setup_ui(settings)
+        .and_then(running::start_processing)
+        .map(results::show_results)
+        .unwrap_or(false) {}
 }
 
 fn font() -> Path {

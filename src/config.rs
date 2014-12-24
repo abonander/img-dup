@@ -2,7 +2,7 @@ use getopts::{OptGroup, optopt, optmulti, optflag, optflagopt, Matches, usage, g
 
 use serialize::json::{ToJson, Json};
 
-use std::collections::TreeMap;
+use std::collections::BTreeMap;
 
 use std::fmt::{Show, Formatter};
 use std::fmt::Result as FormatResult;
@@ -110,7 +110,7 @@ impl Show for ProgramSettings {
 impl ToJson for ProgramSettings {
 
     fn to_json(&self) -> Json {
-        let mut my_json = TreeMap::new();
+        let mut my_json = BTreeMap::new();
         json_insert!(my_json, "threads", self.threads);
         json_insert!(my_json, "dir", self.dir.display().to_string());
         json_insert!(my_json, "recurse", self.recurse);

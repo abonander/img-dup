@@ -9,9 +9,20 @@ use std::default::Default;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Relaxed};
 
+use std::thread::Thread;
+
 use time::precise_time_ns;
 
-pub fn start_processing(settings: ProgramSettings) -> (Total, Vec<UniqueImage>, Vec<ProcessingError>){	
+pub struct Results {
+    pub total: Total,
+    pub done: Vec<UniqueImage>,
+    pub errors: Vec<ProcessingError>,
+    pub avg_load: String,
+    pub avg_hash: String,
+    pub elapsed: String,    
+}
+
+pub fn start_processing(settings: ProgramSettings) -> Option<Results> {	
 	let (mut uic, mut gl, mut events) = create_window("img-dup running", [640, 480]);
 
     let paths = processing::find_images(&settings);
@@ -34,7 +45,7 @@ pub fn start_processing(settings: ProgramSettings) -> (Total, Vec<UniqueImage>, 
 
         match status_rx.try_recv() {
             Ok(Message::Update(status)) => buf.status_update(status),
-            Ok(Message::Finished(result)) => { return result; },
+            Ok(Message::Finished(total, done, errors)) => { return Some(buf.into_results(total, done, errors)); },
             Err(_) => (),
         }
 
@@ -49,7 +60,7 @@ pub fn start_processing(settings: ProgramSettings) -> (Total, Vec<UniqueImage>, 
 		}
 	}
 
-    unreachable!();
+    None
 }
 
 #[deriving(Default)]
@@ -120,6 +131,18 @@ impl Buffers {
         self.count.clear();    
         self.percent.clear();
     }
+
+    fn into_results(self, total: Total, done: Vec<UniqueImage>, errors: Vec<ProcessingError>)
+    -> Results {
+        Results {
+            total: total,
+            done: done,
+            errors: errors,
+            avg_hash: self.avg_hash,
+            avg_load: self.avg_load,
+            elapsed: self.elapsed,
+        } 
+    }
 }
 
 #[inline]
@@ -150,13 +173,11 @@ struct Status {
     errors: uint,
 }
 
-pub type ProcResult = (Total, Vec<UniqueImage>, Vec<ProcessingError>);
 
 enum Message {
     Update(Status),
-    Finished(ProcResult),
+    Finished(Total, Vec<UniqueImage>, Vec<ProcessingError>),
 }
-
 
 fn draw_running_dialog(gl: &mut Gl, uic: &mut UiContext, buf: &mut Buffers) {
     background(gl, uic);
@@ -216,7 +237,7 @@ fn receive_images(img_rx: Receiver<TimedImageResult>, settings: ProgramSettings,
 -> Receiver<Message> {
     let (status_tx, status_rx) = channel();
     
-    spawn(move |:| {        
+    Thread::spawn(move |:| {        
         let mut unique_images = Vec::new();
         let mut errors = Vec::new();
 
@@ -245,8 +266,8 @@ fn receive_images(img_rx: Receiver<TimedImageResult>, settings: ProgramSettings,
             })).is_err() { return; };
         }
       
-        status_tx.send(Message::Finished((count as uint, unique_images, errors)))
-    });
+        status_tx.send(Message::Finished(count as uint + errors.len(), unique_images, errors));    
+    }).detach();
     
     status_rx
 }

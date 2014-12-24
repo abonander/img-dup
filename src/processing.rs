@@ -7,8 +7,6 @@ use image;
 use image::{DynamicImage, GenericImage, ImageError};
 
 use img_hash::ImageHash;
-
-use rustrt::unwind::try;
  
 use serialize::json::{ToJson, Json};
 
@@ -16,9 +14,10 @@ use time::{Tm, now, precise_time_ns};
 
 use std::ascii::AsciiExt;
 use std::boxed::BoxAny;
-use std::collections::TreeMap;
+use std::collections::BTreeMap;
 use std::io::IoResult;
 use std::io::fs::PathExtensions;
+use std::rt::unwind::try;
 
 #[deriving(Send)]
 pub struct Results {
@@ -40,7 +39,7 @@ impl Results {
     }    
 
     pub fn info_json(&self) -> Json {
-        let mut info = TreeMap::new();
+        let mut info = BTreeMap::new();
         json_insert!(info, "start", self.start_time());
         json_insert!(info, "end", self.end_time());
         json_insert!(info, "found", self.total);
@@ -131,7 +130,7 @@ impl ProcessingError {
     }
 
     pub fn to_json(&self, relative_to: &Path) -> Json {
-        let mut json = TreeMap::new();
+        let mut json = BTreeMap::new();
 
         json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
         json_insert!(json, "error", self.err_msg());

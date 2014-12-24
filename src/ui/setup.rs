@@ -267,5 +267,5 @@ fn open_folder_dialog(start_path: &Path) -> Option<Path> {
         .set_starting_path(start_path.clone())
         .show(Sdl2Window::new, OpenGL::_3_2);
 
-    promise.wait().to_opt()      
+    promise.join().unwrap_or(None)
 }
