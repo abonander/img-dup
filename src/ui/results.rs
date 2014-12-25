@@ -54,6 +54,10 @@ pub fn show_results(results: Results) -> bool {
 		None => return false,
     };
 
+	if state.current.similars.is_empty() {
+		state.move_to_next();
+	}
+
     for event in events {
 		if state.exit { break; }
 
@@ -69,7 +73,7 @@ pub fn show_results(results: Results) -> bool {
 		}
 	}
 
-	dialogs::confirm("img_dup again?", "All images processed!", "Scan again?")
+	dialogs::confirm("img_dup again?", "No duplicates left!", "Scan again?")
 }
 
 struct Constants {
@@ -123,18 +127,21 @@ impl ResultsState {
         }
     }
        
-    fn move_to_next(&mut self) -> bool {
+    fn move_to_next(&mut self) {
         self.current = match mem::replace(&mut self.next, self.done.next()) {
-            Some(ref next) if next.similars.is_empty() => 
-				return self.move_to_next(),
+            Some(ref next) if next.similars.is_empty() => {
+				self.move_to_next(); 
+				return;
+			},
 			Some(next) => next,
-            _ => return false,
+            _ => {
+				self.exit = true; 
+				return; 
+			},
         };
                        
         self.update_buffers();
 		self.compare_select = None;
-
-        true
     }
 
     fn update_buffers(&mut self) {
@@ -169,7 +176,7 @@ impl ResultsState {
 		self.compare_select = None;
 		
 		if self.buf.compares.is_empty() {
-			self.exit = !self.move_to_next();
+			self.move_to_next();
 		}	
 	}
 }
