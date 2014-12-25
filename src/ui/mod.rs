@@ -10,6 +10,7 @@ macro_rules! write_str(
 	)
 );
 
+pub mod dialogs;
 mod setup;
 mod running;
 mod results;

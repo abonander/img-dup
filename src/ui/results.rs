@@ -1,3 +1,4 @@
+use super::dialogs;
 use super::prelude::*;
 use super::running::Results;
 use super::util::FormatBytes;
@@ -29,6 +30,7 @@ use image::{
 use sdl2::mouse::{Cursor, SystemCursor};
 
 use std::borrow::ToOwned;
+use std::cell::Cell;
 use std::iter::Peekable;
 use std::io::fs;
 use std::mem;
@@ -53,7 +55,7 @@ pub fn show_results(results: Results) -> bool {
     };
 
     for event in events {
-        if state.go_again { return true; }
+		if state.exit { break; }
 
 		uic.handle_event(&event);
 
@@ -67,7 +69,7 @@ pub fn show_results(results: Results) -> bool {
 		}
 	}
 
-    false
+	dialogs::confirm("img_dup again?", "All images processed!", "Scan again?")
 }
 
 struct Constants {
@@ -81,9 +83,8 @@ struct ResultsState {
     done: IntoIter<UniqueImage>,
     current: UniqueImage,
     next: Option<UniqueImage>,
-    go_next: bool,
     compare_select: Option<uint>,
-    go_again: bool,
+    exit: bool,
     buf: Buffers,
 	wait_cursor: Cursor,
 	reg_cursor: Cursor, 
@@ -110,9 +111,8 @@ impl ResultsState {
                         done: done,
                         current: current,
                         next: next,
-                        go_next: false,
                         compare_select: None,
-                        go_again: false,
+                        exit: false,
 						buf: buf,
 						wait_cursor: wait_cursor,
 						reg_cursor: reg_cursor,
@@ -125,12 +125,14 @@ impl ResultsState {
        
     fn move_to_next(&mut self) -> bool {
         self.current = match mem::replace(&mut self.next, self.done.next()) {
-            Some(next) => next,
+            Some(ref next) if next.similars.is_empty() => 
+				return self.move_to_next(),
+			Some(next) => next,
             _ => return false,
         };
                        
         self.update_buffers();
-
+		self.compare_select = None;
 
         true
     }
@@ -140,11 +142,36 @@ impl ResultsState {
         self.buf = Buffers::create(&self.current, self.next.as_ref());
 		self.reg_cursor.set(); 
     }
-    
+
     fn promote(&mut self, idx: uint) {
         self.current.promote(idx);
-        self.update_buffers(); 
-    }   
+        mem::swap(&mut self.buf.current, &mut self.buf.compares[idx]); 
+    }
+
+	fn delete(&mut self, idx: uint) {
+		fs::unlink(&self.current.similars[idx].img.path);
+		self.remove_compare(idx);
+	}
+
+	fn symlink(&mut self, idx: uint) {
+		{
+			let ref path = self.current.similars[idx].img.path;
+			fs::unlink(path);
+			fs::symlink(&self.current.img.path, path);
+		}
+
+		self.remove_compare(idx);	
+	}
+
+	fn remove_compare(&mut self, idx: uint) {
+		self.current.similars.remove(idx);
+		self.buf.compares.remove(idx);
+		self.compare_select = None;
+		
+		if self.buf.compares.is_empty() {
+			self.exit = !self.move_to_next();
+		}	
+	}
 }
 
 struct Buffers {
@@ -156,11 +183,11 @@ struct Buffers {
 impl Buffers {
     fn create(current: &UniqueImage, next: Option<&UniqueImage>) -> Buffers {
         Buffers {
-            current: ImageBuf::open(&current.img.path).unwrap(),
-            preview_next: next.map(|img| ImageBuf::open(&img.img.path).unwrap()),
+            current: ImageBuf::open(&current.img.path, 0.0).unwrap(),
+            preview_next: next.map(|img| ImageBuf::open(&img.img.path, 0.0).unwrap()),
             compares: current.similars
                 .iter()
-                .map(|similar| ImageBuf::open(&similar.img.path).unwrap())
+                .map(|similar| ImageBuf::open(&similar.img.path, similar.dist_ratio).unwrap())
                 .collect(),
         }            
     }    
@@ -173,12 +200,12 @@ fn draw_results_ui(
 ) {
     background(gl, uic);
 	
-	uic.label("Next Image")
+	uic.label("Next Image (Click)")
 		.position(5.0, 5.0)
 		.size(18)
 		.draw(gl);
 
-	const PREVIEW_IMG_POS: [f64; 2] = [150.0, 5.0];
+	const PREVIEW_IMG_POS: [f64; 2] = [5.0, 30.0];
 	const PREVIEW_IMG_SIZE: [f64; 2] = [150.0, 150.0];
 
 	const NEXT: u64 = 1;
@@ -200,40 +227,113 @@ fn draw_results_ui(
 		|next| next.draw(PREVIEW_IMG_POS, PREVIEW_IMG_SIZE, gl, ctx)
 	);
 
-	const IMG_SIZE: [f64; 2] = [480.0, 608.0];	
+	const IMG_SIZE: [f64; 2] = [480.0, 578.0];	
+ 
+	{
+		let ref current = state.buf.current;
+		current.draw([5.0, 190.0], IMG_SIZE, gl, ctx);
 
-	state.buf.current.draw([5.0, 160.0], IMG_SIZE, gl, ctx);
-
-	const COMPARE_POS: [f64; 2] = [544.0, 160.0];
-	const SHRINK_COMPARE: u64 = NEXT + 1;
-
-	if let Some(selected) = state.compare_select {
-		uic.button(SHRINK_COMPARE)
-			.color(Color::black())
-			.point(COMPARE_POS)
-			.dim(IMG_SIZE)
-			.callback(|| { state.compare_select = None; })
+		uic.label(&*current.name)
+			.position(160.0, 145.0)
+			.size(18)
 			.draw(gl);
 
-		state.buf.compares[selected].draw(COMPARE_POS, IMG_SIZE, gl, ctx);
+		uic.label(&*current.size)
+			.position(160.0, 165.0)
+			.size(18)
+			.draw(gl);
+	}
 
-		// TODO: Action buttons
+	const COMPARE_POS: [f64; 2] = [539.0, 190.0];
+	const SHRINK_COMPARE: u64 = NEXT + 1;
+
+	if let Some(idx) = state.compare_select {
+		if idx >= state.buf.compares.len() { 
+			state.compare_select = None; 
+		} else {
+			uic.button(SHRINK_COMPARE)
+				.color(Color::black())
+				.point(COMPARE_POS)
+				.dim(IMG_SIZE)
+				.callback(|| state.compare_select = None)
+				.draw(gl);
+
+			state.buf.compares[idx].draw(COMPARE_POS, IMG_SIZE, gl, ctx);
+
+			const BUTTON_DIM: [f64; 2] = [70.0, 30.0];
+
+			const IGNORE: u64 = SHRINK_COMPARE + 1;
+			uic.button(IGNORE)
+				.label("Ignore")
+				.label_font_size(18)
+				.up_from(SHRINK_COMPARE, 35.0)
+				.dim(BUTTON_DIM)
+				.callback(|| state.remove_compare(idx))
+				.draw(gl);
+
+			const PROMOTE: u64 = IGNORE + 1;
+			uic.button(PROMOTE)
+				.label("Promote")
+				.label_font_size(18)
+				.up_from(IGNORE, 35.0)
+				.dim(BUTTON_DIM)
+				.callback(|| state.promote(idx))
+				.draw(gl);
+
+			const SYMLINK: u64 = PROMOTE + 1;
+			uic.button(SYMLINK)
+				.label("Symlink")
+				.label_font_size(18)
+				.right_from(IGNORE, 5.0)
+				.dim(BUTTON_DIM)
+				.callback(|| state.symlink(idx))
+				.draw(gl);
+
+			const DELETE: u64 = SYMLINK + 1;
+			uic.button(DELETE)
+				.label("Delete")
+				.label_font_size(18)
+				.up_from(SYMLINK, 35.0)
+				.dimensions(70.0, 30.0)
+				.callback(|| state.delete(idx))
+				.draw(gl);
+
+			if let Some(similar) = state.buf.compares.get(idx) {
+				uic.label(&*similar.name)
+					.position(699.0, 145.0)
+					.size(18)
+					.draw(gl);
+
+				uic.label(&*similar.size)
+					.position(699.0, 165.0)
+					.size(18)
+					.draw(gl);
+
+				uic.label(&*similar.percent)
+					.position(699.0, 125.0)
+					.size(18)
+					.draw(gl);
+			}
+		}
 	} else {
-		const COLS: uint = 4;
-		const ROWS: uint = 8;
+		const COLS: uint = 5;
+		const ROWS: uint = 5;
+		const LABEL_SIZE: u32 = 12;
 
 		uic.widget_matrix(COLS, ROWS)
 			.point(COMPARE_POS)
 			.dim(IMG_SIZE)
-			.cell_padding(5.0, 45.0)
+			.cell_padding(5.0, 15.0)
 			.each_widget(|uic, id, x, y, pt, dim| {
 				let idx = y * COLS + x;
 
 				if idx >= state.buf.compares.len() { return; }
-			
+		
 				uic.button(id as u64 + 30)
 					.color(Color::black())
-					.callback(|| { state.compare_select = Some(idx); })
+					.point(pt)
+					.dim(dim)
+					.callback(|| state.compare_select = Some(idx))
 					.draw(gl);
 					 
 				let ref similar = state.buf.compares[idx];
@@ -242,35 +342,44 @@ fn draw_results_ui(
 
 				let name_y = pt[1] + dim[1] + 5.0;
 
-				uic.label(&*similar.name)
+				uic.label(&*similar.percent)
 					.position(pt[0], name_y)
-					.size(16)
+					.size(LABEL_SIZE)
+					.draw(gl);
+
+				uic.label(&*similar.name)
+					.position(pt[0], name_y + 15.0)
+					.size(LABEL_SIZE)
 					.draw(gl);
 
 				uic.label(&*similar.size)
-					.position(pt[0], name_y + 15.0)
-					.size(16)
+					.position(pt[0], name_y + 30.0)
+					.size(LABEL_SIZE)
 					.draw(gl);
 			});
 	}
 } 
+
 struct ImageBuf {
     image: Texture,
     name: String,
     size: String,
+	percent: String,
 }
 
 impl ImageBuf {
-    fn open(path: &Path) -> ImageResult<ImageBuf> {
+    fn open(path: &Path, percent: f32) -> ImageResult<ImageBuf> {
         let image = try!(image::open(path));
         
-        let name = truncate_name(path, 16);
+        let name = truncate_name(path, 24);
         let (width, height) = image.dimensions();
         let file_size = try!(fs::stat(path)).size;
 
         let size = format!("{} x {} ({})", width, height, FormatBytes(file_size));
 
-        debug!("Name: {} Size: {}", name, size);
+		let percent = format!("{:.02}%", (100.0 - percent * 100.0));
+
+        debug!("Name: {} Size: {} Percent: {}", name, size, percent);
  
         let tex = Texture::from_image(&image.to_rgba());
          
@@ -278,6 +387,7 @@ impl ImageBuf {
                 image: tex,
                 name: name,
                 size: size,
+				percent: percent,
         })
     }
 
