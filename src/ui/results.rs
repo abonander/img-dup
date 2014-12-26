@@ -2,42 +2,30 @@ use ui::dialogs;
 use ui::errors::{show_errors_list, ErrorBuf};
 use ui::prelude::*;
 use ui::running::Results;
-use ui::util::FormatBytes;
 
 use img::UniqueImage;
-use processing::{mod, TimedImageResult, ProcessingError, Total};
 
 use graphics::{
 	mod,
 	BackEnd, 
 	Context, 
-	Image, 
 	ImageSize, 
-	Rectangle,
 	RelativeTransform,
 };
-use gl;
 use opengl_graphics::Texture;
 
 use image::{
     mod, 
-    DynamicImage,
     GenericImage,
-    ImageBuffer, 
     ImageResult, 
-    Rgba
 };
 
 use sdl2::mouse::{Cursor, SystemCursor};
 
-use std::borrow::ToOwned;
-use std::cell::Cell;
-use std::fmt::Show;
-use std::iter::Peekable;
+use std::fmt::{mod, Show, Formatter};
 use std::io::fs;
 use std::mem;
 use std::sync::Arc;
-use std::vec::IntoIter;
 
 pub fn show_results(results: Results) -> bool {  
     let ref consts = Constants {
@@ -556,4 +544,35 @@ fn print_err<T, E>(result: Result<T, E>) where E: Show {
     }
 }
 
+#[deriving(Copy)]
+struct FormatBytes(pub u64);
+
+impl FormatBytes { 
+    #[inline]
+    fn to_kb(self) -> f64 {
+        (self.0 as f64) / 1.0e3   
+    }
+
+    #[inline]
+    fn to_mb(self) -> f64 {
+        (self.0 as f64) / 1.0e6
+    }
+
+    #[inline]
+    fn to_gb(self) -> f64 {
+        (self.0 as f64) / 1.0e9
+    }
+}
+
+
+impl Show for FormatBytes {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
+        match self.0 {
+            0 ... 999 => format_args!(|args| fmt.write_fmt(args), "{} B", self.0),
+            1_000 ... 999_999 => format_args!(|args| fmt.write_fmt(args), "{:.02} KB", self.to_kb()),
+            1_000_000 ... 999_999_999 => format_args!(|args| fmt.write_fmt(args), "{:.02} MB", self.to_mb()),
+            _ => format_args!(|args| fmt.write_fmt(args), "{:.02} GB", self.to_gb()),
+        }
+    }        
+}
 

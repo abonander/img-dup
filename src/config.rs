@@ -2,6 +2,8 @@ use getopts::{OptGroup, optopt, optmulti, optflag, optflagopt, Matches, usage, g
 
 use serialize::json::{ToJson, Json};
 
+use std::borrow::ToOwned;
+
 use std::collections::BTreeMap;
 
 use std::fmt::{Show, Formatter};
@@ -195,7 +197,7 @@ fn outfile_arg(args: &Matches, arg: &str, dir: &Path) -> Option<Path> {
 
 fn uint_arg(args: &Matches, arg: &str, default: uint) -> uint {
     let val = args.opt_str(arg).map_or(default, |arg_str|   
-                from_str::<uint>(arg_str.as_slice()).unwrap()
+                arg_str.parse::<uint>().unwrap()
         );
 
     val
@@ -204,7 +206,7 @@ fn uint_arg(args: &Matches, arg: &str, default: uint) -> uint {
 fn pos_f32_arg(args: &Matches, arg: &str, default: f32) -> f32 {
     let val = args.opt_str(arg)
         .map_or(default, |arg_str|
-                from_str::<f32>(arg_str.as_slice()).unwrap()
+                arg_str.parse::<f32>().unwrap()
         );
     
     assert!(val > 0f32 && val < 100f32, 
@@ -213,19 +215,18 @@ fn pos_f32_arg(args: &Matches, arg: &str, default: f32) -> f32 {
     val
 }
 
-fn exts_args<'a>(args: &'a Matches, arg: &'a str, default: Vec<&'static str>) 
-    -> Vec<String> {
+fn exts_args<'a>(args: &'a Matches, arg: &'a str, default: Vec<&'static str>) -> Vec<String> {
     if args.opt_present(arg) {
         args.opt_strs(arg)
     } else {
-        default.iter().map(|str_slice| str_slice.into_string()).collect()
+        default.into_iter().map(ToOwned::to_owned).collect()
     }
 }
 
 fn json_arg(args: &Matches, arg: &str, default: JsonSettings) -> JsonSettings {
     if args.opt_present(arg) {
         match args.opt_str(arg) {
-            Some(indent) => JsonSettings::PrettyJson(from_str::<uint>(indent.as_slice()).unwrap()),
+            Some(indent) => JsonSettings::PrettyJson(indent.parse::<uint>().unwrap()),
             None => JsonSettings::CompactJson,
         }
     } else {

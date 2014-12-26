@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 use std::io::IoResult;
 use std::io::fs::PathExtensions;
 use std::rt::unwind::try;
+use std::thread::Thread;
 
 #[deriving(Send)]
 pub struct Results {
@@ -187,13 +188,13 @@ pub fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
         let task_tx = tx.clone();
         let mut task_work = work.clone();
 
-        spawn(move || {            
+        Thread::spawn(move || {            
             for path in task_work {
                 let img_result = load_and_hash_image(&hash_settings, path);
                                                 
                 if task_tx.send_opt(img_result).is_err() { break; }
             }
-        });
+        }).detach();
     }
 
     rx
@@ -227,7 +228,7 @@ fn load_and_hash_image(settings: &HashSettings, path: Path) -> TimedImageResult 
             Ok((hash, load_time, hash_time))
         },
         Ok(Err(img_err)) => Err(ProcessingError::Decoding(path, img_err)),
-        Err(cause) => Err(ProcessingError::Misc(path, cause.into_string())),
+        Err(cause) => Err(ProcessingError::Misc(path, cause.to_string())),
     }
 }
 
@@ -236,7 +237,7 @@ fn try_hash_image(path: Path, img: &DynamicImage, hash_size: u32, fast: bool) ->
     
     match try_fn(|| ImageHash::hash(img, hash_size, fast)) {
         Ok(hash) => Ok(Image::new(path, hash, width, height)),
-        Err(cause) => Err(ProcessingError::Misc(path, cause.into_string())),    
+        Err(cause) => Err(ProcessingError::Misc(path, cause.to_string())),    
     }      
 }
 

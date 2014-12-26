@@ -15,7 +15,6 @@ mod setup;
 mod running;
 mod results;
 mod errors;
-mod util;
 
 pub fn show_gui(mut settings: ProgramSettings) {
     let mut again = true;
@@ -44,13 +43,15 @@ pub mod prelude {
     pub use opengl_graphics::glyph_cache::GlyphCache;
     pub use sdl2_window::Sdl2Window;
 
+    use std::borrow::ToOwned;
+
     pub type UiEvents = Events<Sdl2Window>;
 
     const GL_VER: OpenGL = OpenGL::_3_2;
 
     pub fn create_window(name: &str, dimen: [u32, ..2]) -> (UiContext, Gl, UiEvents) {
 	    let window = Sdl2Window::new(GL_VER, WindowSettings {
-		    title: name.into_string(),
+		    title: name.to_owned(),
 		    size: dimen,
 		    fullscreen: false,
 		    exit_on_esc: false,

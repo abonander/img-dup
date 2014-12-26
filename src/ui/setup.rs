@@ -53,7 +53,7 @@ impl ConfigState {
 	}
 
 	fn set_threads(&mut self, threads: &mut String) {
-		if let Some(threads) = from_str::<uint>(&**threads) {
+		if let Some(threads) = threads.parse() {
 			self.settings.threads = threads;
 		} else {
 			threads.clear();
@@ -82,7 +82,7 @@ impl ConfigState {
     }
     
     fn set_hash_size(&mut self, hash_size: &mut String) {
-		if let Some(hash_size) = from_str::<u32>(&**hash_size) {
+		if let Some(hash_size) = hash_size.parse() {
 			self.settings.hash_size = hash_size;
 		} else {
 			hash_size.clear();

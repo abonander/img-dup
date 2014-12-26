@@ -22,12 +22,11 @@ use processing::process;
 
 use std::io::util::NullWriter;
 
-use std::intrinsics;
 use std::os;
 
 macro_rules! json_insert(
     ($map:expr, $key:expr, $val:expr) => (
-        $map.insert($key.into_string(), $val.to_json())
+        $map.insert(::std::borrow::ToOwned::to_owned($key), $val.to_json())
     );
 );
 
