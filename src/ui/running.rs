@@ -73,6 +73,7 @@ struct Buffers {
     count: String,
     elapsed: String,
     elapsed_ns: u64,
+    done: uint, 
     total: uint,
     stop: bool,
     slider_cur: f64,
@@ -86,7 +87,7 @@ impl Buffers {
         write_str!(self.avg_load, "Avg Load (ms): {}", ns_to_ms(status.avg_load));
         write_str!(self.avg_hash, "Avg Hash (ms): {}", ns_to_ms(status.avg_hash));
 
-        self.set_est_time(status.count + status.errors);
+        self.done = status.count + status.errors;
 
         write_str!(self.count, 
             "Current (Errors) / Total: {} ({}) / {}", 
@@ -98,8 +99,12 @@ impl Buffers {
         write_str!(self.percent, "{:.02}%", (self.slider_cur / self.slider_max) * 100.0);
     }
 
-    fn set_est_time(&mut self, done: uint) {
-        let est_secs = ns_to_secs(self.elapsed_ns / done as u64 * self.total as u64 - self.elapsed_ns); 
+    fn update_est_time(&mut self) {
+        self.est_time_rem.clear();
+
+        let est_secs = ns_to_secs(
+            self.elapsed_ns / self.done as u64 * self.total as u64 - self.elapsed_ns
+        ); 
 
         let (hr, min, sec) = secs_to_hr_min_sec(est_secs);
 
@@ -119,13 +124,14 @@ impl Buffers {
         let (hr, min, sec) = secs_to_hr_min_sec(elapsed_secs);
 
         self.elapsed.clear();
-        write_str!(self.elapsed, "Elapsed: {}:{:02}:{:02}", hr, min, sec); 
+        write_str!(self.elapsed, "Elapsed: {}:{:02}:{:02}", hr, min, sec);
+
+        self.update_est_time();
     }
 
     fn clear_buffers(&mut self) {
         self.avg_load.clear();
         self.avg_hash.clear();
-        self.est_time_rem.clear();
         self.count.clear();    
         self.percent.clear();
     }
