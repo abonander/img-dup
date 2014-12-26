@@ -124,8 +124,8 @@ impl ProcessingError {
 
     pub fn err_msg(&self) -> String {
         match *self {
-            ProcessingError::Decoding(_, ref img_err) => format!("Decoding error: {}", img_err),
-            ProcessingError::Misc(_, ref misc_err) => format!("Processing error: {}", misc_err),
+            ProcessingError::Decoding(_, ref img_err) => format!("Loading error: {}", img_err),
+            ProcessingError::Misc(_, ref misc_err) => format!("Hashing error: {}", misc_err),
         }
     }
 
