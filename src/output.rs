@@ -6,7 +6,7 @@ use serialize::Encodable;
 use serialize::json::Encoder as JsonEncoder;
 use serialize::json::{Json, PrettyEncoder, ToJson};
 
-use std::collections::TreeMap;
+use std::collections::BTreeMap;
 
 use std::io::fs::File;
 use std::io::stdio::{stdout, StdWriter};
@@ -30,7 +30,7 @@ pub fn output_results(settings: &ProgramSettings, results: &Results) -> IoResult
 
 fn json_output(settings: &ProgramSettings, results: &Results, out: &mut Writer) -> IoResult<()> { 
     let output = {
-        let mut json = TreeMap::new();
+        let mut json = BTreeMap::new();
  
         let dir = &settings.dir;
 

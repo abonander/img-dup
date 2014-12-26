@@ -2,11 +2,12 @@ use img_hash::ImageHash;
 
 use serialize::json::{Json, ToJson};
 
-use std::collections::TreeMap;
+use std::collections::BTreeMap;
 use std::io::IoResult;
+use std::mem;
 use std::path::Path;
 
-#[deriving(Clone)]
+#[deriving(Eq, PartialEq, Clone)]
 pub struct Image {
     pub path: Path,
     pub hash: ImageHash,
@@ -29,8 +30,8 @@ impl Image {
         self.path.path_relative_from(relative_to).unwrap_or(self.path.clone())
     }
 
-    pub fn to_treemap(&self, relative_to: &Path) -> TreeMap<String, Json> {
-        let mut json = TreeMap::new();
+    pub fn to_treemap(&self, relative_to: &Path) -> BTreeMap<String, Json> {
+        let mut json = BTreeMap::new();
 
         json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
         json_insert!(json, "hash", self.hash.to_base64());
@@ -67,7 +68,7 @@ impl UniqueImage {
 
     pub fn similars(&self) -> Vec<SimilarImage> {
         let mut temp = self.similars.clone();
-        temp.sort_by(|a, b| a.dist_ratio.partial_cmp(&b.dist_ratio).unwrap());
+        temp.sort();
         temp    
     }
 
@@ -97,9 +98,19 @@ impl UniqueImage {
 
         Json::Object(json)
     }
+
+    pub fn promote(&mut self, idx: uint) {
+        mem::swap(&mut self.similars[idx].img, &mut self.img);
+        for similar in self.similars.iter_mut() {
+            let dist_ratio = self.img.hash.dist_ratio(&similar.img.hash);
+            similar.dist_ratio = dist_ratio;
+        }
+        
+        self.similars.sort()
+    } 
 }
 
-#[deriving(Clone)]
+#[deriving(PartialEq, Clone)]
 pub struct SimilarImage {
    pub img: Image, 
    // Distance from the containing UniqueImage
@@ -131,4 +142,18 @@ impl SimilarImage {
         Json::Object(json)
     }
 }
+
+impl Ord for SimilarImage {
+    fn cmp(&self, other: &SimilarImage) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Equal)   
+    }
+}
+
+impl PartialOrd for SimilarImage {
+    fn partial_cmp(&self, other: &SimilarImage) -> Option<Ordering> {
+        self.dist_ratio.partial_cmp(&other.dist_ratio)                    
+    }    
+}
+
+impl Eq for SimilarImage {}
 
