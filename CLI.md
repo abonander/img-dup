@@ -1,6 +1,6 @@
 Command Line Usage
 ==================
-```shell
+```
 $ ./img_dup --help
 Duplicate Image Finder
 
