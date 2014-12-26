@@ -1,57 +1,56 @@
 use super::prelude::*;
 
-pub fn confirm(title: &str, line_1: &str, line_2: &str) -> bool {
-	let (mut uic, mut gl, mut events) = create_window(title, [300, 90]);
+use std::thread::Thread;
 
-	let ref mut answer = ConfirmResponse::Waiting;
+pub fn confirm(title: &'static str, message: &'static str) -> bool {
+	Thread::spawn(move || {
 
-	for event in events {
-		if *answer != ConfirmResponse::Waiting {
-			return *answer == ConfirmResponse::Yes;
-		}
+	    let (mut uic, mut gl, mut events) = create_window(title, [450, 60]);
+        let ref mut answer = ConfirmResponse::Waiting;
 
-		uic.handle_event(&event);
-		match event {
-			Event::Render(args) => {
-				gl.draw([0, 0, args.width as i32, args.height as i32], |_, gl| {
-					draw_confirm_dialog(gl, &mut uic, line_1, line_2, answer);
-				});
-			},
-			_ => (),
-		}
-	}
+        for event in events {
+            if *answer != ConfirmResponse::Waiting {
+                return *answer == ConfirmResponse::Yes;
+            }
 
-	false
+            uic.handle_event(&event);
+            match event {
+                Event::Render(args) => {
+                    gl.draw([0, 0, args.width as i32, args.height as i32], |_, gl| {
+                        draw_confirm_dialog(gl, &mut uic, message, answer);
+                    });
+                },
+                _ => (),
+            }
+        }
+
+        false
+    }).join().unwrap_or(false)
 }
 
 fn draw_confirm_dialog(
 	gl: &mut Gl, 
 	uic: &mut UiContext, 
-	line_1: &str, line_2: &str,
+	message: &str,
 	answer: &mut ConfirmResponse,
 ) {
 	background(gl, uic);
 
-	uic.label(line_1)
-		.position(5.0, 5.0)
-		.size(18)
-		.draw(gl);
-
-	uic.label(line_2)
-		.position(5.0, 30.0)
+	uic.label(message)
+		.position(5.0, 0.0)
 		.size(18)
 		.draw(gl);
 
 	uic.button(1)
 		.label("Yes")
-		.position(75.0, 55.0) 
+		.position(155.0, 25.0) 
 		.dimensions(70.0, 30.0)
 		.callback(|| *answer = ConfirmResponse::Yes)
 		.draw(gl);
 
 	uic.button(2)
 		.label("No")
-		.position(150.0, 55.0)
+        .right_from(1, 5.0)
 		.dimensions(70.0, 30.0)
 		.callback(|| *answer = ConfirmResponse::No)
 		.draw(gl);

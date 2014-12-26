@@ -1,4 +1,5 @@
 use ui::prelude::*;
+use ui::dialogs;
 
 use config::ProgramSettings;
 use img::UniqueImage;
@@ -41,7 +42,7 @@ pub fn start_processing(settings: ProgramSettings) -> Option<Results> {
 	for event in events {
         buf.set_elapsed(precise_time_ns() - start);
 
-        if buf.stop == 2 { stop.store(true, Relaxed); }
+        if buf.stop { stop.store(true, Relaxed); }
 
         match status_rx.try_recv() {
             Ok(Message::Update(status)) => buf.status_update(status),
@@ -73,10 +74,7 @@ struct Buffers {
     elapsed: String,
     elapsed_ns: u64,
     total: uint,
-    // stop == 0 -> continue
-    // stop == 1 -> confirm
-    // stop == 2 -> stop!
-    stop: u8,
+    stop: bool,
     slider_cur: f64,
     slider_max: f64,
 }
@@ -222,13 +220,9 @@ fn draw_running_dialog(gl: &mut Gl, uic: &mut UiContext, buf: &mut Buffers) {
     uic.button(STOP)
         .position(485.0, 35.0)
         .dimensions(80.0, 30.0)
-        .label(match buf.stop {
-            0 => "Stop",
-            1 => "Really?",
-            _ => "Stopping",
-        })
+        .label("Stop")
         .label_font_size(18)
-        .callback(|| buf.stop += 1)
+        .callback(|| buf.stop = confirm_stop())
         .draw(gl);
 }
 
@@ -269,5 +263,12 @@ fn receive_images(img_rx: Receiver<TimedImageResult>, settings: ProgramSettings,
     }).detach();
     
     status_rx
+}
+
+fn confirm_stop() -> bool {
+    dialogs::confirm(
+        "Stop processing now?",
+        "Some duplicates may remain unmatched."
+    )
 }
 

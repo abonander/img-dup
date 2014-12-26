@@ -31,6 +31,7 @@ use sdl2::mouse::{Cursor, SystemCursor};
 
 use std::borrow::ToOwned;
 use std::cell::Cell;
+use std::fmt::Show;
 use std::iter::Peekable;
 use std::io::fs;
 use std::mem;
@@ -57,7 +58,7 @@ pub fn show_results(results: Results) -> bool {
 	}
 
     for event in events {
-		if state.exit { break; }
+		if state.exit { return dialogs::confirm("All images processed!", "Scan again?"); }
 
 		uic.handle_event(&event);
 
@@ -66,12 +67,13 @@ pub fn show_results(results: Results) -> bool {
 				gl.draw([0, 0, args.width as i32, args.height as i32], |ref ctx, gl| {
 					draw_results_ui(gl, ctx, &mut uic, &mut state, consts);
 				});
-			}
+			},
 			_ => (),
 		}
 	}
-
-	dialogs::confirm("img_dup again?", "No duplicates left!", "Scan again?")
+    
+    // User clicked exit
+    false	
 }
 
 struct Constants {
@@ -154,15 +156,17 @@ impl ResultsState {
     }
 
 	fn delete(&mut self, idx: uint) {
-		fs::unlink(&self.current.similars[idx].img.path);
+		print_err(fs::unlink(&self.current.similars[idx].img.path));
 		self.remove_compare(idx);
 	}
 
 	fn symlink(&mut self, idx: uint) {
 		{
 			let ref path = self.current.similars[idx].img.path;
-			fs::unlink(path);
-			fs::symlink(&self.current.img.path, path);
+
+            print_err(
+                fs::unlink(path).and_then(|_| fs::symlink(&self.current.img.path, path))
+            );
 		}
 
 		self.remove_compare(idx);	
@@ -221,8 +225,8 @@ fn draw_results_ui(
 		.label(if state.buf.preview_next.is_none() { "None" } else { "" })
 		.label_font_size(24)
 		.label_color(Color::white())
-		.callback(||
-			if state.buf.preview_next.is_some() {
+		.callback(
+            || if state.buf.preview_next.is_some() && confirm_skip() {
 				state.move_to_next(); 
 			}
 		)
@@ -291,7 +295,8 @@ fn draw_results_ui(
 				.label_font_size(18)
 				.right_from(IGNORE, 5.0)
 				.dim(BUTTON_DIM)
-				.callback(|| state.symlink(idx))
+				.callback(
+                    || if confirm_symlink() { state.symlink(idx); })
 				.draw(gl);
 
 			const DELETE: u64 = SYMLINK + 1;
@@ -300,7 +305,7 @@ fn draw_results_ui(
 				.label_font_size(18)
 				.up_from(SYMLINK, 35.0)
 				.dimensions(70.0, 30.0)
-				.callback(|| state.delete(idx))
+				.callback(|| if confirm_delete() { state.delete(idx); })
 				.draw(gl);
 
 			if let Some(similar) = state.buf.compares.get(idx) {
@@ -433,4 +438,31 @@ fn truncate_name(path: &Path, len: uint) -> String {
 	} else { 
 		path.filename_display().to_string()
 	}
+}
+
+fn confirm_symlink() -> bool {
+    dialogs::confirm(
+        "Symlink image?", 
+        "Image will be replaced. This cannot be undone!"
+    ) 
+}
+
+fn confirm_delete() -> bool {
+    dialogs::confirm(
+        "Delete image permanently?",
+        "This cannot be undone!"
+    )  
+}
+
+fn confirm_skip() -> bool {
+    dialogs::confirm(
+        "Skip to next image?",
+        "You won't be able to go back!"
+    )  
+}
+
+fn print_err<T, E>(result: Result<T, E>) where E: Show {
+    if let Err(err) = result {
+        println!("Encountered nonfatal error: {}", err);    
+    }
 }
