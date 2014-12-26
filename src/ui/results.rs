@@ -1,7 +1,8 @@
-use super::dialogs;
-use super::prelude::*;
-use super::running::Results;
-use super::util::FormatBytes;
+use ui::dialogs;
+use ui::errors::{show_errors_list, ErrorBuf};
+use ui::prelude::*;
+use ui::running::Results;
+use ui::util::FormatBytes;
 
 use img::UniqueImage;
 use processing::{mod, TimedImageResult, ProcessingError, Total};
@@ -35,6 +36,7 @@ use std::fmt::Show;
 use std::iter::Peekable;
 use std::io::fs;
 use std::mem;
+use std::sync::Arc;
 use std::vec::IntoIter;
 
 pub fn show_results(results: Results) -> bool {  
@@ -42,23 +44,26 @@ pub fn show_results(results: Results) -> bool {
         avg_load: results.avg_load,
         avg_hash: results.avg_hash,
         elapsed: results.elapsed,
-        errors: results.errors,
+        total: format!("Total Images Processed: {}", results.total),
+        view_errors: format!("View Errors ({})", results.errors.len()),
+        errors: ErrorBuf::arc_vec(results.errors, &results.search_path),
     };
 
 	const WINDOW_SIZE: [u32; 2] = [1024, 768];
 	let (mut uic, mut gl, mut events) = create_window("img-dup results", WINDOW_SIZE);
 
-	let mut state = match ResultsState::new(results.done.into_iter()) {
+    draw_loading_message(&mut gl, &mut uic, &mut events);
+
+    let mut done = results.done;
+    done.retain(|unique| !unique.similars.is_empty());
+
+	let mut state = match ResultsState::new(done) {
 		Some(state) => state,
-		None => return false,
+		None => return scan_again(),
     };
-
-	if state.current.similars.is_empty() {
-		state.move_to_next();
-	}
-
+	
     for event in events {
-		if state.exit { return dialogs::confirm("All images processed!", "Scan again?"); }
+		if state.exit { return scan_again(); }
 
 		uic.handle_event(&event);
 
@@ -76,29 +81,58 @@ pub fn show_results(results: Results) -> bool {
     false	
 }
 
+// Draw the message on a single frame, then return.
+fn draw_loading_message(gl: &mut Gl, uic: &mut UiContext, events: &mut UiEvents) {
+    let mut drawn = false;
+
+    for event in *events {
+        uic.handle_event(&event);
+
+		match event {
+			Event::Render(args) => {
+                if drawn { break; }
+
+				gl.draw([0, 0, args.width as i32, args.height as i32], |_, gl| {
+				    background(gl, uic);
+                    uic.label("Loading results, please wait...")
+                        .position(360.0, 324.0)
+                        .size(24)
+                        .draw(gl);                 
+                });
+
+                drawn = true;
+			},
+			_ => (),
+		}
+    }            
+}
+
 struct Constants {
     avg_load: String,
     avg_hash: String,
     elapsed: String,
-    errors: Vec<ProcessingError>,
+    total: String,
+    view_errors: String,
+    errors: Arc<Vec<ErrorBuf>>,
 }
 
 struct ResultsState {
-    done: IntoIter<UniqueImage>,
+    done: Vec<UniqueImage>,
     current: UniqueImage,
     next: Option<UniqueImage>,
     compare_select: Option<uint>,
     exit: bool,
     buf: Buffers,
+    next_str: String,
 	wait_cursor: Cursor,
 	reg_cursor: Cursor, 
 }
 
 impl ResultsState {
-    fn new(mut done: IntoIter<UniqueImage>) -> Option<ResultsState> {
-        match done.next() {
+    fn new(mut done: Vec<UniqueImage>) -> Option<ResultsState> {
+        match done.pop() {
             Some(current) => {
-                let next = done.next();
+                let next = done.pop();
 				
 				let wait_cursor = Cursor::from_system(SystemCursor::Wait)
 					.unwrap();
@@ -109,6 +143,10 @@ impl ResultsState {
 				let reg_cursor = Cursor::from_system(SystemCursor::Arrow)
 					.unwrap();
 				reg_cursor.set();
+
+                let mut next_str = String::new();
+
+                fmt_next_str(&mut next_str, done.len(), next.is_some());
             
                 Some(
                     ResultsState {
@@ -118,7 +156,8 @@ impl ResultsState {
                         compare_select: None,
                         exit: false,
 						buf: buf,
-						wait_cursor: wait_cursor,
+                        next_str: next_str,						
+                        wait_cursor: wait_cursor,
 						reg_cursor: reg_cursor,
 					}
                 )
@@ -128,12 +167,8 @@ impl ResultsState {
     }
        
     fn move_to_next(&mut self) {
-        self.current = match mem::replace(&mut self.next, self.done.next()) {
-            Some(ref next) if next.similars.is_empty() => {
-				self.move_to_next(); 
-				return;
-			},
-			Some(next) => next,
+        self.current = match mem::replace(&mut self.next, self.done.pop()) {
+            Some(next) => next,
             _ => {
 				self.exit = true; 
 				return; 
@@ -147,7 +182,9 @@ impl ResultsState {
     fn update_buffers(&mut self) {
 		self.wait_cursor.set(); 
         self.buf = Buffers::create(&self.current, self.next.as_ref());
-		self.reg_cursor.set(); 
+		self.reg_cursor.set();
+
+        fmt_next_str(&mut self.next_str, self.done.len(), self.next.is_some());
     }
 
     fn promote(&mut self, idx: uint) {
@@ -183,6 +220,12 @@ impl ResultsState {
 	}
 }
 
+#[inline]
+fn fmt_next_str(s: &mut String, remaining: uint, add_one: bool) {
+    s.clear();
+    write_str!(s, "Next ({} left)", remaining + if add_one { 1 } else { 0 });    
+}
+
 struct Buffers {
     current: ImageBuf,
     preview_next: Option<ImageBuf>,
@@ -198,7 +241,7 @@ impl Buffers {
                 .iter()
                 .map(|similar| ImageBuf::open(&similar.img.path, similar.dist_ratio).unwrap())
                 .collect(),
-        }            
+        }
     }    
 }
 
@@ -209,13 +252,13 @@ fn draw_results_ui(
 ) {
     background(gl, uic);
 	
-	uic.label("Next Image (Click)")
+	uic.label(&*state.next_str)
 		.position(5.0, 5.0)
 		.size(18)
 		.draw(gl);
 
 	const PREVIEW_IMG_POS: [f64; 2] = [5.0, 30.0];
-	const PREVIEW_IMG_SIZE: [f64; 2] = [150.0, 150.0];
+	const PREVIEW_IMG_SIZE: [f64; 2] = [75.0, 75.0];
 
 	const NEXT: u64 = 1;
 	uic.button(NEXT)
@@ -236,25 +279,65 @@ fn draw_results_ui(
 		|next| next.draw(PREVIEW_IMG_POS, PREVIEW_IMG_SIZE, gl, ctx)
 	);
 
-	const IMG_SIZE: [f64; 2] = [480.0, 578.0];	
+    const AVGS_X: f64 = 225.0;
+    uic.label(&*consts.avg_load)
+        .position(AVGS_X, 5.0)
+        .size(18)
+        .draw(gl);
+
+    uic.label(&*consts.avg_hash)
+        .position(AVGS_X, 25.0)
+        .size(18)
+        .draw(gl);
+
+    uic.label(&*consts.elapsed)
+        .position(AVGS_X + 165.0, 5.0)
+        .size(18)
+        .draw(gl);
+
+    uic.label(&*consts.total)
+        .position(AVGS_X + 300.0, 5.0)
+        .size(18)
+        .draw(gl);
+    
+    const VIEW_ERRORS: u64 = NEXT + 1;
+    uic.button(VIEW_ERRORS)
+        .position(869.0, 20.0)
+        .dimensions(150.0, 30.0)
+        .label(&*consts.view_errors)
+        .label_font_size(20)
+        .callback(|| show_errors_list(consts.errors.clone()))
+        .draw(gl);
+
+    const SCAN_AGAIN: u64 = VIEW_ERRORS + 1;
+    uic.button(SCAN_AGAIN)
+        .down_from(VIEW_ERRORS, 5.0)
+        .dimensions(150.0, 30.0)
+        .label("Scan Again")
+        .label_font_size(20)
+        .callback(|| state.exit = true)
+        .draw(gl);
+
+	const IMG_SIZE: [f64; 2] = [500.0, 660.0];
+    const IMG_Y: f64 = 115.0;	
  
 	{
 		let ref current = state.buf.current;
-		current.draw([5.0, 190.0], IMG_SIZE, gl, ctx);
+		current.draw([5.0, IMG_Y], IMG_SIZE, gl, ctx);
 
 		uic.label(&*current.name)
-			.position(160.0, 145.0)
+			.position(160.0, IMG_Y - 45.0)
 			.size(18)
 			.draw(gl);
 
 		uic.label(&*current.size)
-			.position(160.0, 165.0)
+			.position(160.0, IMG_Y - 25.0)
 			.size(18)
 			.draw(gl);
 	}
 
-	const COMPARE_POS: [f64; 2] = [539.0, 190.0];
-	const SHRINK_COMPARE: u64 = NEXT + 1;
+	const COMPARE_POS: [f64; 2] = [519.0, IMG_Y];
+	const SHRINK_COMPARE: u64 = SCAN_AGAIN + 1;
 
 	if let Some(idx) = state.compare_select {
 		if idx >= state.buf.compares.len() { 
@@ -310,17 +393,17 @@ fn draw_results_ui(
 
 			if let Some(similar) = state.buf.compares.get(idx) {
 				uic.label(&*similar.name)
-					.position(699.0, 145.0)
+					.position(699.0, IMG_Y - 45.0)
 					.size(18)
 					.draw(gl);
 
 				uic.label(&*similar.size)
-					.position(699.0, 165.0)
+					.position(699.0, IMG_Y - 25.0)
 					.size(18)
 					.draw(gl);
 
 				uic.label(&*similar.percent)
-					.position(699.0, 125.0)
+					.position(699.0, IMG_Y - 65.0)
 					.size(18)
 					.draw(gl);
 			}
@@ -333,7 +416,7 @@ fn draw_results_ui(
 		uic.widget_matrix(COLS, ROWS)
 			.point(COMPARE_POS)
 			.dim(IMG_SIZE)
-			.cell_padding(5.0, 15.0)
+			.cell_padding(15.0, 15.0)
 			.each_widget(|uic, id, x, y, pt, dim| {
 				let idx = y * COLS + x;
 
@@ -368,6 +451,8 @@ fn draw_results_ui(
 					.draw(gl);
 			});
 	}
+
+
 } 
 
 struct ImageBuf {
@@ -387,7 +472,7 @@ impl ImageBuf {
 
         let size = format!("{} x {} ({})", width, height, FormatBytes(file_size));
 
-		let percent = format!("{:.02}%", (100.0 - percent * 100.0));
+		let percent = format!("Diff: {:.02}%", percent * 100.0);
  
         let tex = Texture::from_image(&image.to_rgba());
          
@@ -461,8 +546,14 @@ fn confirm_skip() -> bool {
     )  
 }
 
+fn scan_again() -> bool {
+    dialogs::confirm("No matches remaining or found!", "Scan again?")    
+}
+
 fn print_err<T, E>(result: Result<T, E>) where E: Show {
     if let Err(err) = result {
         println!("Encountered nonfatal error: {}", err);    
     }
 }
+
+
