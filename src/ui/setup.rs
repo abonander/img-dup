@@ -7,7 +7,7 @@ use std::default::Default;
 pub fn show_setup_ui(settings: ProgramSettings) -> Option<ProgramSettings> {	
 	let (mut state, mut buf) = ConfigState::from_settings(settings);
 
-	let (mut uic, mut gl, mut events) = create_window("img-dup configuration", [640, 480]);
+	let (mut uic, mut gl, mut events) = create_window("img-dup configuration", [740, 120]);
 		
 	for event in events {
         if state.canceled { break; }
@@ -129,14 +129,14 @@ fn draw_setup_dialog(gl: &mut Gl, uic: &mut UiContext, state: &mut ConfigState, 
     const DIR: u64 = 1;
 	uic.text_box(DIR, &mut buf.dir)
         .font_size(18)
-		.position(5.0, 30.0)
-		.dimensions(555.0, 30.0)
+		.position(5.0, 25.0)
+		.dimensions(665.0, 30.0)
 		.callback(|dir| state.update_dir(dir))
 		.draw(gl);
 		
 	uic.label("Search Directory")
         .size(18)
-		.up_from(DIR, 20.0)
+		.up_from(DIR, 25.0)
 		.draw(gl);
 
     const BROWSE: u64 = DIR + 1;
@@ -208,30 +208,30 @@ fn draw_setup_dialog(gl: &mut Gl, uic: &mut UiContext, state: &mut ConfigState, 
         
     const THRESHOLD: u64 = USE_DCT + 1;
     uic.slider(THRESHOLD, state.settings.threshold, 0.01, 0.10)
-        .down_from(THREADS, 30.0)
+        .right_from(USE_DCT, 50.0)
         .dimensions(240.0, 30.0)
         .callback(|threshold| state.set_threshold(buf, threshold))
         .draw(gl);
 
     uic.label(&*buf.threshold)
-        .up_from(THRESHOLD, 25.0)
+        .up_from(THRESHOLD, 20.0)
         .size(18)
         .draw(gl);
-
-    const CANCEL: u64 = THRESHOLD + 1;
-    uic.button(CANCEL)
-        .label("Cancel")
-        .down_from(BROWSE, 30.0)
-        .dimensions(60.0, 30.0)
-        .callback(|| state.canceled = true)
-        .draw(gl);
     
-    const GO: u64 = CANCEL + 1;
+    const GO: u64 = THRESHOLD + 1;
     uic.button(GO)
         .label("Go!")
-        .down_from(CANCEL, 5.0)
+        .down_from(BROWSE, 30.0)
         .dimensions(60.0, 30.0)
         .callback(|| state.confirmed = true)
+        .draw(gl);
+
+    const CANCEL: u64 = GO + 1;
+    uic.button(CANCEL)
+        .label("Cancel")
+        .left_from(GO, 85.0)
+        .dimensions(80.0, 30.0)
+        .callback(|| state.canceled = true)
         .draw(gl);
 }
 
