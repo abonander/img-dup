@@ -24,7 +24,7 @@ pub struct Results {
 }
 
 pub fn start_processing(settings: ProgramSettings) -> Option<Results> {	
-	let (mut uic, mut gl, mut events) = create_window("img-dup running", [640, 480]);
+	let (mut uic, mut gl, mut events) = create_window("img-dup running", [570, 80]);
 
     let paths = processing::find_images(&settings);
 
@@ -99,7 +99,7 @@ impl Buffers {
     }
 
     fn set_est_time(&mut self, done: uint) {
-        let est_secs = ns_to_secs(self.elapsed_ns / done as u64 * self.total as u64); 
+        let est_secs = ns_to_secs(self.elapsed_ns / done as u64 * self.total as u64 - self.elapsed_ns); 
 
         let (hr, min, sec) = secs_to_hr_min_sec(est_secs);
 
@@ -183,7 +183,7 @@ fn draw_running_dialog(gl: &mut Gl, uic: &mut UiContext, buf: &mut Buffers) {
     const PROGRESS: u64 = 1;
     uic.slider(PROGRESS, buf.slider_cur, 0.0, buf.slider_max)
         .position(5.0, 5.0)
-        .dimensions(470.0, 30.0)
+        .dimensions(490.0, 30.0)
         .draw(gl);
 
     uic.label(&*buf.percent)
@@ -207,18 +207,18 @@ fn draw_running_dialog(gl: &mut Gl, uic: &mut UiContext, buf: &mut Buffers) {
         .draw(gl);
 
     uic.label(&*buf.avg_hash)
-        .position(170.0, 55.0)
+        .position(175.0, 55.0)
         .size(18)
         .draw(gl);
 
     uic.label(&*buf.est_time_rem)
-        .position(340.0, 55.0)
+        .position(352.0, 55.0)
         .size(18)
         .draw(gl);
 
     const STOP: u64 = 2;
     uic.button(STOP)
-        .position(485.0, 35.0)
+        .position(485.0, 45.0)
         .dimensions(80.0, 30.0)
         .label("Stop")
         .label_font_size(18)
