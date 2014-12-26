@@ -83,9 +83,10 @@ Stop processing, and only compare the images already done. A dialog will appear 
 
 Results Window
 --------------
+(Black areas in image areas are to be expected. Transparent areas in images with an alpha channel will have a black background.)
 
 ###Overview Mode
-![](screenshots/results_thumbs.png "Screenshot of Overview Mode")
+![](screenshots/results_overview.png "Screenshot of Overview Mode")
 
 If there are no images left in the queue after the last one has had all actions taken, or no matches were found, a dialog will appear asking if you want to scan again. Click "Yes" to be taken back to the setup window, or "No" to exit.
 
@@ -94,6 +95,12 @@ The thumbnail in the top-left corner is the next image to inspect, or none if th
 The main features of this window are the large preview of the "master" image on the left (with its file information printed above), and a list of thumbnails on the right (with their file information printed below each one, as well as % difference).
 
 Click a thumbnail on the right to switch to **Compare Mode**, which enlarges the matched image and its information, and adds several action buttons above it.
+
+#####View Errors(#)
+Open the **Errors Window** to view the error messages for the images that could not be loaded.
+
+#####Scan Again
+Trigger the "Scan Again?" dialog.
 
 ###Compare Mode
 ![](screenshots/results_compare.png "Screenshot of Compare Mode")
@@ -115,4 +122,25 @@ Delete this image from the disk and remove it from the list of matches. A dialog
 Replace this image on-disk with a symbolic link to the "master" image under the same name, and remove it from the list of matches. 
 
 Safer than deletion, but still **cannot be undone** (the original image will still be deleted from disk). A dialog will appear to confirm.
+
+Errors Window
+------------
+![](screenshots/errors.png "Screenshot of the Errors Window")
+
+View error messages for individual images. **Image** and **Message** will display `N/A` if there were no errors.
+
+#####Prev
+Go to the previous error, if any.
+
+#####Next
+Go to the next error, if any.
+
+#####Done
+Close this dialog and resume comparing results.
+
+#####Image
+The path of the image that could not be loaded or hashed.
+
+#####Message
+The error message resulting from attempting to load or hash the image.
 
