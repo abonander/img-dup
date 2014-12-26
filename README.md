@@ -3,7 +3,12 @@ img-dup
 
 A tool for finding duplicate and similar images in directory trees, written in Rust
 
-Powered by https://github.com/cybergeek94/img_hash
+Powered by: 
+* https://github.com/rust-lang/rust
+
+* https://github.com/PistonDevelopers/conrod
+
+* https://github.com/cybergeek94/img_hash
 
 Usage
 =====
@@ -39,8 +44,14 @@ sudo apt-get install libfreetype6-dev libsdl2-dev
 
 git clone https://github.com/cybergeek94/img_dup
 cd img_dup
-cargo build
+cargo run
 ```
+
+TODO
+====
+* UI cleanups
+* Windows, Mac, Linux binary packages
+* Launchpad PPA
 
 License
 =======
