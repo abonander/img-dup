@@ -1,6 +1,6 @@
 [root]
-name = "img-dup"
-version = "0.3.0"
+name = "img_dup"
+version = "1.0.0"
 dependencies = [
  "conrod 0.0.0 (git+https://github.com/PistonDevelopers/conrod)",
  "file_dialog 0.0.1 (git+https://github.com/cybergeek94/file_dialog)",

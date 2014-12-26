@@ -40,7 +40,11 @@ mod par_queue;
 fn main() {
     run();
 
-    // Exit immediately, don't leave any threads alive
+    exit();
+}
+
+// Exit immediately, don't leave any threads alive
+pub fn exit() {    
     unsafe { libc::exit(0); }   
 }
 
