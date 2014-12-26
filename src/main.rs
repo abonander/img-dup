@@ -10,7 +10,6 @@ extern crate gl;
 extern crate image;
 extern crate img_hash;
 extern crate libc;
-#[phase(plugin, link)] extern crate log;
 extern crate opengl_graphics;
 extern crate sdl2;
 extern crate sdl2_window;

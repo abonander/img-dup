@@ -44,8 +44,6 @@ pub fn show_results(results: Results) -> bool {
         errors: results.errors,
     };
 
-    debug!("Done: {}", results.done.len());
-
 	const WINDOW_SIZE: [u32; 2] = [1024, 768];
 	let (mut uic, mut gl, mut events) = create_window("img-dup results", WINDOW_SIZE);
 
@@ -385,8 +383,6 @@ impl ImageBuf {
         let size = format!("{} x {} ({})", width, height, FormatBytes(file_size));
 
 		let percent = format!("{:.02}%", (100.0 - percent * 100.0));
-
-        debug!("Name: {} Size: {} Percent: {}", name, size, percent);
  
         let tex = Texture::from_image(&image.to_rgba());
          
