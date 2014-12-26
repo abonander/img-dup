@@ -15,6 +15,7 @@ use std::thread::Thread;
 use time::precise_time_ns;
 
 pub struct Results {
+    pub search_path: Path,
     pub total: Total,
     pub done: Vec<UniqueImage>,
     pub errors: Vec<ProcessingError>,
@@ -34,8 +35,11 @@ pub fn start_processing(settings: ProgramSettings) -> Option<Results> {
     buf.total = paths.len();
     buf.slider_max = buf.total as f64;
 
-    let start = precise_time_ns();
+    // Start with 1 second on the clock
+    let start = precise_time_ns() - 1_000_000_000;
     let img_rx = processing::spawn_threads(&settings, paths);
+
+    let search_path = settings.dir.clone();
 
     let status_rx = receive_images(img_rx, settings, stop.clone());
    		
@@ -46,7 +50,9 @@ pub fn start_processing(settings: ProgramSettings) -> Option<Results> {
 
         match status_rx.try_recv() {
             Ok(Message::Update(status)) => buf.status_update(status),
-            Ok(Message::Finished(total, done, errors)) => { return Some(buf.into_results(total, done, errors)); },
+            Ok(Message::Finished(total, done, errors)) => { 
+                return Some(buf.into_results(total, done, errors, search_path)); 
+            },
             Err(_) => (),
         }
 
@@ -102,9 +108,11 @@ impl Buffers {
     fn update_est_time(&mut self) {
         self.est_time_rem.clear();
 
-        let est_secs = ns_to_secs(
-            self.elapsed_ns / self.done as u64 * self.total as u64 - self.elapsed_ns
-        ); 
+        let est_secs = if self.done > 0 {
+            ns_to_secs(self.elapsed_ns / self.done as u64 * self.total as u64 - self.elapsed_ns)
+        } else {
+            1
+        };
 
         let (hr, min, sec) = secs_to_hr_min_sec(est_secs);
 
@@ -136,9 +144,15 @@ impl Buffers {
         self.percent.clear();
     }
 
-    fn into_results(self, total: Total, done: Vec<UniqueImage>, errors: Vec<ProcessingError>)
-    -> Results {
+    fn into_results(
+        self, 
+        total: Total, 
+        done: Vec<UniqueImage>, 
+        errors: Vec<ProcessingError>, 
+        search_path: Path
+    ) -> Results { 
         Results {
+            search_path: search_path,
             total: total,
             done: done,
             errors: errors,

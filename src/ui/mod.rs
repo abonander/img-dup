@@ -14,6 +14,7 @@ pub mod dialogs;
 mod setup;
 mod running;
 mod results;
+mod errors;
 mod util;
 
 pub fn show_gui(settings: ProgramSettings) {
@@ -36,9 +37,11 @@ pub mod prelude {
     pub use opengl_graphics::glyph_cache::GlyphCache;
     pub use sdl2_window::Sdl2Window;
 
+    pub type UiEvents = Events<Sdl2Window>;
+
     const GL_VER: OpenGL = OpenGL::_3_2;
 
-    pub fn create_window(name: &str, dimen: [u32, ..2]) -> (UiContext, Gl, Events<Sdl2Window>) {
+    pub fn create_window(name: &str, dimen: [u32, ..2]) -> (UiContext, Gl, UiEvents) {
 	    let window = Sdl2Window::new(GL_VER, WindowSettings {
 		    title: name.into_string(),
 		    size: dimen,
