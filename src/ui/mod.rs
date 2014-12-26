@@ -17,11 +17,18 @@ mod results;
 mod errors;
 mod util;
 
-pub fn show_gui(settings: ProgramSettings) {
-	while setup::show_setup_ui(settings.clone())
-        .and_then(running::start_processing)
-        .map(results::show_results)
-        .unwrap_or(false) {}
+pub fn show_gui(mut settings: ProgramSettings) {
+    let mut again = true;
+
+	while again {
+        again = setup::show_setup_ui(settings.clone())
+            .and_then(|config| { 
+                settings = config.clone(); 
+                running::start_processing(config)
+            })
+            .map(results::show_results)
+            .unwrap_or(false);
+    }
 }
 
 fn font() -> Path {
