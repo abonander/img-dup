@@ -1,4 +1,4 @@
-img-dup
+`img_dup`
 =======
 
 A tool for finding duplicate and similar images in directory trees, written in Rust
