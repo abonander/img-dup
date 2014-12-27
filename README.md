@@ -12,23 +12,23 @@ Powered by:
 
 Usage
 =====
-
-Launch GUI:
-```shell
-# Binary
-./img_dup -g
-
-# Running with Cargo
-cargo run -- -g
-```
-
 Scan local directory in CLI:
 ```shell
 # Binary
+cargo build
 ./img_dup
 
 # Cargo
 cargo run
+```
+
+Launch GUI (requires `img_dup` to be compiled with GUI support):
+```shell
+# Binary
+./img_dup -g
+
+# Cargo
+cargo run --features="gui" -- -g
 ```
 
 For a guide on the Graphical User Interface, see `GUI.md` in this repository.
@@ -38,18 +38,34 @@ For information on the command line flags, see `CLI.md` in this repository.
 Building
 ========
 
-Ubuntu-based:
-```shell
-sudo apt-get install libfreetype6-dev libsdl2-dev
+`img_dup` is built without GUI support by default for compatibility with CLI-only systems. It will not pull in SDL2 or Freetype and doesn't require them to build or run if compiled without GUI support. See the next section for building with GUI support.
 
+```shell
 git clone https://github.com/cybergeek94/img_dup
 cd img_dup
-cargo run
+cargo build
+```
+
+Building with GUI support
+==========================
+
+####Prerequisites
+```shell
+sudo apt-get install libfreetype6-dev libsdl2-dev
+```
+####Building the GUI
+Pass the `--features="gui"` flag to Cargo:
+```shell
+cargo build --features="gui"
+
+#OR
+
+cargo run --features="gui" -- -g
 ```
 
 TODO
 ====
-* UI cleanups
+* UI cleanups/improvements
 * Windows, Mac, Linux binary packages
 * Launchpad PPA
 
@@ -62,7 +78,5 @@ Please see `LICENSE.md` in this repository.
 
 GPL-Licensed Font
 =================
-This program uses the GPL-licensed `FreeSerif.otf` font, copied, unmodified, from the [GNU Freefont][1] distribution.
-Since this program is GPL, it is free to include GPL-licensed fonts.
-
+This program uses the GPL-licensed `FreeSerif.otf` font, unmodified, from the [GNU Freefont][1] distribution.
 [1]: https://www.gnu.org/software/freefont/index.html
