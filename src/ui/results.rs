@@ -3,24 +3,23 @@ use ui::errors::{show_errors_list, ErrorBuf};
 use ui::prelude::*;
 use ui::running::Results;
 
-use img::UniqueImage;
-
-use graphics::{
+use ui::graphics::{
 	mod,
 	BackEnd, 
 	Context, 
 	ImageSize, 
 	RelativeTransform,
 };
-use opengl_graphics::Texture;
+use ui::opengl_graphics::Texture;
+use ui::sdl2::mouse::{Cursor, SystemCursor};
+
+use img::UniqueImage;
 
 use image::{
     mod, 
     GenericImage,
     ImageResult, 
 };
-
-use sdl2::mouse::{Cursor, SystemCursor};
 
 use std::fmt::{mod, Show, Formatter};
 use std::io::fs;

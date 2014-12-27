@@ -1,18 +1,9 @@
 #![feature(macro_rules, globs, unsafe_destructor, phase)]
 
-extern crate conrod;
-extern crate current;
-extern crate event;
-extern crate file_dialog;
-extern crate graphics;
 extern crate getopts;
-extern crate gl;
 extern crate image;
 extern crate img_hash;
 extern crate libc;
-extern crate opengl_graphics;
-extern crate sdl2;
-extern crate sdl2_window;
 extern crate serialize;
 extern crate time;
 
@@ -34,8 +25,10 @@ mod config;
 mod img;
 mod output;
 mod processing;
-mod ui;
 mod par_queue;
+
+#[cfg(feature = "gui")]
+mod ui;
 
 fn main() {
     run();
@@ -48,13 +41,23 @@ pub fn exit() {
     unsafe { libc::exit(0); }   
 }
 
+#[cfg(feature = "gui")]
+fn show_gui(settings: ProgramSettings) {   
+	ui::show_gui(settings);
+}
+
+#[cfg(not(feature = "gui"))]
+fn show_gui(_: ProgramSettings) {
+    println!("img_dup was not compiled with GUI support!");    
+}
+
 fn run() {
     let args = os::args();
 
     let settings = parse_args(args.as_slice());
 
 	if settings.gui {
-		ui::show_gui(settings);
+        show_gui(settings);
 		return;
 	}
 

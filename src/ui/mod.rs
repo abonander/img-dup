@@ -1,3 +1,13 @@
+extern crate conrod;
+extern crate current;
+extern crate event;
+extern crate file_dialog;
+extern crate graphics;
+extern crate gl;
+extern crate opengl_graphics;
+extern crate sdl2;
+extern crate sdl2_window;
+
 use config::ProgramSettings;
 
 macro_rules! write_str(
@@ -36,12 +46,12 @@ fn font() -> Path {
 
 /// Everything that should be needed to create a UI.
 pub mod prelude {
-    pub use conrod::*;
-    pub use current::Set;
-    pub use event::{Event, Events, Ups, MaxFps, WindowSettings};
-    pub use opengl_graphics::{Gl, OpenGL};
-    pub use opengl_graphics::glyph_cache::GlyphCache;
-    pub use sdl2_window::Sdl2Window;
+    pub use ui::conrod::*;
+    pub use ui::current::Set;
+    pub use ui::event::{Event, Events, Ups, MaxFps, WindowSettings};
+    pub use ui::opengl_graphics::{Gl, OpenGL};
+    pub use ui::opengl_graphics::glyph_cache::GlyphCache;
+    pub use ui::sdl2_window::Sdl2Window;
 
     use std::borrow::ToOwned;
 

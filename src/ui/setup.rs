@@ -258,7 +258,7 @@ fn draw_spinner(gl: &mut Gl, uic: &mut UiContext, id: u64, callback: |int|) {
 }
 
 fn open_folder_dialog(start_path: &Path) -> Option<Path> {
-    use file_dialog::{FileDialog, SelectType};
+    use ui::file_dialog::{FileDialog, SelectType};
 
     let font = GlyphCache::new(&super::font()).unwrap();
 
