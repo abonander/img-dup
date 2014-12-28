@@ -265,7 +265,7 @@ fn open_folder_dialog(start_path: &Path) -> Option<Path> {
     let promise = FileDialog::new("Select Search Directory", font)
         .set_select(SelectType::Folder)
         .set_starting_path(start_path.clone())
-        .show(Sdl2Window::new, OpenGL::_3_2);
+        .show(OpenGL::_3_2);
 
     promise.join().unwrap_or(None)
 }
