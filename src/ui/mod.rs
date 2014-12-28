@@ -25,6 +25,7 @@ mod setup;
 mod running;
 mod results;
 mod errors;
+mod util;
 
 pub fn show_gui(mut settings: ProgramSettings) {
     let mut again = true;

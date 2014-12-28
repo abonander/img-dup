@@ -2,6 +2,7 @@ use ui::dialogs;
 use ui::errors::{show_errors_list, ErrorBuf};
 use ui::prelude::*;
 use ui::running::Results;
+use ui::util::{FormatBytes, ImgLoader, print_err};
 
 use ui::graphics::{
 	mod,
@@ -16,12 +17,11 @@ use ui::sdl2::mouse::{Cursor, SystemCursor};
 use img::UniqueImage;
 
 use image::{
-    mod, 
     GenericImage,
-    ImageResult, 
+    ImageResult,
+    RgbaImage,
 };
 
-use std::fmt::{mod, Show, Formatter};
 use std::io::fs;
 use std::mem;
 use std::sync::Arc;
@@ -107,6 +107,7 @@ struct ResultsState {
     done: Vec<UniqueImage>,
     current: UniqueImage,
     next: Option<UniqueImage>,
+    loader: ImgLoader,
     compare_select: Option<uint>,
     exit: bool,
     buf: Buffers,
@@ -125,7 +126,8 @@ impl ResultsState {
 					.unwrap();
 				wait_cursor.set();
 
-                let buf = Buffers::create(&current, next.as_ref());
+                let mut loader = ImgLoader::new();
+                let buf = Buffers::create(&mut loader, &current, next.as_ref());
 
 				let reg_cursor = Cursor::from_system(SystemCursor::Arrow)
 					.unwrap();
@@ -140,6 +142,7 @@ impl ResultsState {
                         done: done,
                         current: current,
                         next: next,
+                        loader: loader,
                         compare_select: None,
                         exit: false,
 						buf: buf,
@@ -164,11 +167,12 @@ impl ResultsState {
                        
         self.update_buffers();
 		self.compare_select = None;
+        self.preload_next();
     }
 
     fn update_buffers(&mut self) {
 		self.wait_cursor.set(); 
-        self.buf = Buffers::create(&self.current, self.next.as_ref());
+        self.buf = Buffers::create(&mut self.loader, &self.current, self.next.as_ref());
 		self.reg_cursor.set();
 
         fmt_next_str(&mut self.next_str, self.done.len(), self.next.is_some());
@@ -205,6 +209,23 @@ impl ResultsState {
 			self.move_to_next();
 		}	
 	}
+
+    fn preload_next(&mut self) {
+        if let Some(ref next) = self.next {
+            for similar in next.similars.iter() {
+                self.loader.begin_load(&similar.img.path);    
+            }     
+        }
+        
+        // .last() will get ref of result of next .pop()
+        if let Some(next_next) = self.done.last() {
+            self.loader.begin_load(&next_next.img.path);
+            
+            for similar in next_next.similars.iter() {
+                self.loader.begin_load(&similar.img.path);
+            }                
+        }
+    }
 }
 
 #[inline]
@@ -220,13 +241,15 @@ struct Buffers {
 }
 
 impl Buffers {
-    fn create(current: &UniqueImage, next: Option<&UniqueImage>) -> Buffers {
+    fn create(loader: &mut ImgLoader, current: &UniqueImage, next: Option<&UniqueImage>) -> Buffers {
+        let ref cur_path = current.img.path;
+
         Buffers {
-            current: ImageBuf::open(&current.img.path, 0.0).unwrap(),
-            preview_next: next.map(|img| ImageBuf::open(&img.img.path, 0.0).unwrap()),
+            current: ImageBuf::load(loader, cur_path, 0.0).unwrap(),
+            preview_next: next.map(|img| ImageBuf::load(loader, &img.img.path, 0.0).unwrap()),
             compares: current.similars
                 .iter()
-                .map(|similar| ImageBuf::open(&similar.img.path, similar.dist_ratio).unwrap())
+                .map(|similar| ImageBuf::load(loader, &similar.img.path, similar.dist_ratio).unwrap())
                 .collect(),
         }
     }    
@@ -438,8 +461,6 @@ fn draw_results_ui(
 					.draw(gl);
 			});
 	}
-
-
 } 
 
 struct ImageBuf {
@@ -450,26 +471,30 @@ struct ImageBuf {
 }
 
 impl ImageBuf {
-    fn open(path: &Path, percent: f32) -> ImageResult<ImageBuf> {
-        let image = try!(image::open(path));
-        
+    fn load(loader: &mut ImgLoader, path: &Path, percent: f32) -> ImageResult<ImageBuf> {
+        let image = try!(loader.get_result(path));
+        Ok(ImageBuf::from_image(path, image, percent))   
+    }
+
+    fn from_image(path: &Path, image: RgbaImage, percent: f32) -> ImageBuf {
         let name = truncate_name(path, 24);
         let (width, height) = image.dimensions();
-        let file_size = try!(fs::stat(path)).size;
+        let file_size = fs::stat(path).unwrap().size;
 
         let size = format!("{} x {} ({})", width, height, FormatBytes(file_size));
 
 		let percent = format!("Diff: {:.02}%", percent * 100.0);
  
-        let tex = Texture::from_image(&image.to_rgba());
+        let tex = Texture::from_image(&image);
          
-        Ok(ImageBuf {
-                image: tex,
-                name: name,
-                size: size,
-				percent: percent,
-        })
+        ImageBuf {
+            image: tex,
+            name: name,
+            size: size,
+			percent: percent,
+        }
     }
+
 
     fn draw(
 		&self, 
@@ -537,41 +562,4 @@ fn scan_again() -> bool {
     dialogs::confirm("No matches remaining or found!", "Scan again?")    
 }
 
-fn print_err<T, E>(result: Result<T, E>) where E: Show {
-    if let Err(err) = result {
-        println!("Encountered nonfatal error: {}", err);    
-    }
-}
-
-#[deriving(Copy)]
-struct FormatBytes(pub u64);
-
-impl FormatBytes { 
-    #[inline]
-    fn to_kb(self) -> f64 {
-        (self.0 as f64) / 1.0e3   
-    }
-
-    #[inline]
-    fn to_mb(self) -> f64 {
-        (self.0 as f64) / 1.0e6
-    }
-
-    #[inline]
-    fn to_gb(self) -> f64 {
-        (self.0 as f64) / 1.0e9
-    }
-}
-
-
-impl Show for FormatBytes {
-    fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
-        match self.0 {
-            0 ... 999 => format_args!(|args| fmt.write_fmt(args), "{} B", self.0),
-            1_000 ... 999_999 => format_args!(|args| fmt.write_fmt(args), "{:.02} KB", self.to_kb()),
-            1_000_000 ... 999_999_999 => format_args!(|args| fmt.write_fmt(args), "{:.02} MB", self.to_mb()),
-            _ => format_args!(|args| fmt.write_fmt(args), "{:.02} GB", self.to_gb()),
-        }
-    }        
-}
 
