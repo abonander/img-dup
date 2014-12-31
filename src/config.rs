@@ -13,7 +13,7 @@ use std::io::fs::PathExtensions;
 
 use std::os;
 
-#[deriving(Send, Clone)]
+#[deriving(Clone)]
 pub struct ProgramSettings {
     pub threads: uint,
     pub dir: Path,
@@ -28,6 +28,8 @@ pub struct ProgramSettings {
     pub json: JsonSettings,
 	pub gui: bool,
 }
+
+unsafe impl Send for ProgramSettings {}
 
 impl ProgramSettings {
 

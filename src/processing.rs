@@ -20,7 +20,6 @@ use std::io::fs::PathExtensions;
 use std::rt::unwind::try;
 use std::thread::Thread;
 
-#[deriving(Send)]
 pub struct Results {
     pub total: Total,
     pub start_time: Tm,
@@ -28,6 +27,8 @@ pub struct Results {
     pub uniques: Vec<UniqueImage>,
     pub errors: Vec<ProcessingError>,    
 }
+
+unsafe impl Send for Results {}
 
 impl Results {
 
@@ -106,11 +107,12 @@ impl Results {
     }
 } 
 
-#[deriving(Send)]
 pub enum ProcessingError {
     Decoding(Path, ImageError),
     Misc(Path, String),
 }
+
+unsafe impl Send for ProcessingError {}
 
 impl ProcessingError {
     

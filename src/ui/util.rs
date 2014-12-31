@@ -38,13 +38,10 @@ impl FormatBytes {
 impl Show for FormatBytes {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), fmt::Error> {
         match self.0 {
-            0 ... 999 => 
-                format_args!(|args| fmt.write_fmt(args), "{} B", self.0),
-            1_000 ... 999_999 => 
-                format_args!(|args| fmt.write_fmt(args), "{:.02} KB", self.to_kb()),
-            1_000_000 ... 999_999_999 => 
-                format_args!(|args| fmt.write_fmt(args), "{:.02} MB", self.to_mb()),
-            _ => format_args!(|args| fmt.write_fmt(args), "{:.02} GB", self.to_gb()),
+            0 ... 999 => fmt.write_fmt(format_args!("{} B", self.0)),
+            1_000 ... 999_999 => fmt.write_fmt(format_args!("{:.02} KB", self.to_kb())),
+            1_000_000 ... 999_999_999 => fmt.write_fmt(format_args!("{:.02} MB", self.to_mb())),
+            _ => fmt.write_fmt(format_args!("{:.02} GB", self.to_gb())),
         }
     }        
 }

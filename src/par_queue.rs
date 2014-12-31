@@ -11,6 +11,10 @@ pub struct ParQueue<T> where T: Send + Sync {
     cur: AtomicUint,    
 }
 
+unsafe impl<T: Send + Sync> Send for ParQueue<T> {}
+
+unsafe impl<T: Send + Sync> Sync for ParQueue<T> {}
+
 impl<T> ParQueue<T> where T: Send + Sync {
     pub fn from_vec(vec: Vec<T>) -> ParQueue<T> {
         let len = vec.len();
