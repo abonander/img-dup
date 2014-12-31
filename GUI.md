@@ -1,11 +1,15 @@
-img_dup GUI Guide
+`img_dup` GUI Guide
 =================
 
 To start `img_dup` in GUI mode, pass the `-g` flag. Any other config flags will set the starting values in the setup window.
 
+#####Note
+`img_dup` must be compiled will GUI support or else it will simply print a warning and exit. See `README.md` in this repository for more information.
+
+####Running `img_dup`
 Cargo:
 ```shell
-cargo run -- -g
+cargo run --features="gui" -- -g
 ```
 
 Standalone binary:

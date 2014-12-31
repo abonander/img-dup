@@ -1,4 +1,4 @@
-Command Line Usage
+`img_dup` Command Line Usage
 ==================
 ```
 $ ./img_dup --help
