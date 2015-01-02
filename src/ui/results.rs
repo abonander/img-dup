@@ -124,14 +124,15 @@ impl ResultsState {
 				
 				let wait_cursor = Cursor::from_system(SystemCursor::Wait)
 					.unwrap();
-				wait_cursor.set();
+                // UFCS because waitcursor.set() would try to find an impl for quack::Set::set(). 
+				Cursor::set(&wait_cursor);
 
                 let mut loader = ImgLoader::new();
                 let buf = Buffers::create(&mut loader, &current, next.as_ref());
 
 				let reg_cursor = Cursor::from_system(SystemCursor::Arrow)
 					.unwrap();
-				reg_cursor.set();
+				Cursor::set(&reg_cursor);
 
                 let mut next_str = String::new();
 
@@ -171,9 +172,9 @@ impl ResultsState {
     }
 
     fn update_buffers(&mut self) {
-		self.wait_cursor.set(); 
+		Cursor::set(&self.wait_cursor); 
         self.buf = Buffers::create(&mut self.loader, &self.current, self.next.as_ref());
-		self.reg_cursor.set();
+		Cursor::set(&self.reg_cursor);
 
         fmt_next_str(&mut self.next_str, self.done.len(), self.next.is_some());
     }

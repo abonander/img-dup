@@ -1,5 +1,5 @@
 extern crate conrod;
-extern crate current;
+extern crate quack;
 extern crate event;
 extern crate file_dialog;
 extern crate graphics;
@@ -48,7 +48,7 @@ fn font() -> Path {
 /// Everything that should be needed to create a UI.
 pub mod prelude {
     pub use ui::conrod::*;
-    pub use ui::current::Set;
+    pub use ui::quack::Set;
     pub use ui::event::{Event, Events, Ups, MaxFps, WindowSettings};
     pub use ui::opengl_graphics::{Gl, OpenGL};
     pub use ui::opengl_graphics::glyph_cache::GlyphCache;

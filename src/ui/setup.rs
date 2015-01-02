@@ -260,9 +260,7 @@ fn draw_spinner(gl: &mut Gl, uic: &mut UiContext, id: u64, callback: |int|) {
 fn open_folder_dialog(start_path: &Path) -> Option<Path> {
     use ui::file_dialog::{FileDialog, SelectType};
 
-    let font = GlyphCache::new(&super::font()).unwrap();
-
-    let promise = FileDialog::new("Select Search Directory", font)
+    let promise = FileDialog::new("Select Search Directory", super::font())
         .set_select(SelectType::Folder)
         .set_starting_path(start_path.clone())
         .show(OpenGL::_3_2);
