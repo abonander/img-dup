@@ -7,7 +7,7 @@ use image;
 use image::{DynamicImage, GenericImage, ImageError};
 
 use img_hash::ImageHash;
- 
+
 use serialize::json::{ToJson, Json};
 
 use time::{Tm, now, precise_time_ns};
@@ -25,7 +25,7 @@ pub struct Results {
     pub start_time: Tm,
     pub end_time: Tm,
     pub uniques: Vec<UniqueImage>,
-    pub errors: Vec<ProcessingError>,    
+    pub errors: Vec<ProcessingError>,
 }
 
 unsafe impl Send for Results {}
@@ -38,7 +38,7 @@ impl Results {
 
     fn end_time(&self) -> String {
         self.end_time.ctime().to_string()
-    }    
+    }
 
     pub fn info_json(&self) -> Json {
         let mut info = BTreeMap::new();
@@ -53,12 +53,12 @@ impl Results {
 
     pub fn uniques_json(&self, relative_to: &Path, dup_only: bool) -> Json {
         let uniques_json: Vec<Json> = self.uniques.iter()
-        .filter_map( |unique| 
+        .filter_map( |unique|
                 if dup_only && unique.similars.is_empty() {
                     None
                 } else {
                     Some(unique.to_json(relative_to))
-                }  
+                }
         ).collect();
 
         Json::Array(uniques_json)
@@ -69,7 +69,7 @@ impl Results {
             .map( |error| error.to_json(relative_to) )
             .collect();
 
-        Json::Array(errors_json)        
+        Json::Array(errors_json)
     }
 
     pub fn write_info(&self, out: &mut Writer) -> IoResult<()> {
@@ -86,7 +86,7 @@ impl Results {
                 continue;
             } else {
                 try!(
-                    newline_before_after(out, 
+                    newline_before_after(out,
                         |outa| unique.write_self(outa, relative_to))
                 );
             }
@@ -98,14 +98,14 @@ impl Results {
     pub fn write_errors(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
         for error in self.errors.iter() {
             try!(
-                newline_before_after(out, 
+                newline_before_after(out,
                     |outa| error.write_self(outa, relative_to))
             );
         }
 
         Ok(())
     }
-} 
+}
 
 pub enum ProcessingError {
     Decoding(Path, ImageError),
@@ -115,7 +115,7 @@ pub enum ProcessingError {
 unsafe impl Send for ProcessingError {}
 
 impl ProcessingError {
-    
+
     pub fn relative_path(&self, relative_to: &Path) -> Path {
         let path = match *self {
             ProcessingError::Decoding(ref path, _) => path,
@@ -138,7 +138,7 @@ impl ProcessingError {
         json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
         json_insert!(json, "error", self.err_msg());
 
-        Json::Object(json)        
+        Json::Object(json)
     }
 
     pub fn write_self(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
@@ -158,7 +158,7 @@ pub type Total = uint;
 
 pub fn process(settings: &ProgramSettings, paths: Vec<Path>) -> Results {
     let start_time = now();
-   
+
     let (total, uniques, errors) = process_multithread(settings, paths);
 
     Results {
@@ -167,19 +167,19 @@ pub fn process(settings: &ProgramSettings, paths: Vec<Path>) -> Results {
         end_time: now(),
         uniques: uniques,
         errors: errors,
-    }    
+    }
 }
 
 fn process_multithread(settings: &ProgramSettings, paths: Vec<Path>)
-    -> (Total, Vec<UniqueImage>, Vec<ProcessingError>) {                
+    -> (Total, Vec<UniqueImage>, Vec<ProcessingError>) {
     let rx = spawn_threads(settings, paths);
 
-    receive_images(rx, settings)       
+    receive_images(rx, settings)
 }
 
-pub fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>) 
+pub fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
     -> Receiver<TimedImageResult> {
-    
+
     let work = ParQueue::from_vec(paths).into_iter();
 
     let (tx, rx) = channel();
@@ -190,10 +190,10 @@ pub fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
         let task_tx = tx.clone();
         let mut task_work = work.clone();
 
-        Thread::spawn(move || {            
+        Thread::spawn(move || {
             for path in task_work {
                 let img_result = load_and_hash_image(&hash_settings, path);
-                                                
+
                 if task_tx.send_opt(img_result).is_err() { break; }
             }
         }).detach();
@@ -205,7 +205,7 @@ pub fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
 type ImageLoadResult = Result<DynamicImage, ImageError>;
 
 
-fn try_fn<'a, T>(f: || -> T) -> Result<T, Box<&'a str>> {
+fn try_fn<'a, T, F: FnOnce() -> T>(f: F) -> Result<T, Box<&'a str>> {
     let mut maybe: Option<T> = None;
 
     let err = unsafe { try(|| maybe = Some(f())) };
@@ -213,14 +213,14 @@ fn try_fn<'a, T>(f: || -> T) -> Result<T, Box<&'a str>> {
     match maybe {
         Some(val) => Ok(val),
         None => Err(err.unwrap_err().downcast::<&str>().unwrap()),
-    }        
+    }
 }
 
 fn load_and_hash_image(settings: &HashSettings, path: Path) -> TimedImageResult {
-    let start_load = precise_time_ns();    
+    let start_load = precise_time_ns();
     let image = try_fn(|| image::open(&path));
     let load_time =  precise_time_ns() - start_load;
- 
+
     match image {
         Ok(Ok(image)) => {
             let start_hash = precise_time_ns();
@@ -235,20 +235,20 @@ fn load_and_hash_image(settings: &HashSettings, path: Path) -> TimedImageResult 
 }
 
 fn try_hash_image(path: Path, img: &DynamicImage, hash_size: u32, fast: bool) -> ImageResult {
-    let (width, height) = img.dimensions(); 
-    
+    let (width, height) = img.dimensions();
+
     match try_fn(|| ImageHash::hash(img, hash_size, fast)) {
         Ok(hash) => Ok(Image::new(path, hash, width, height)),
-        Err(cause) => Err(ProcessingError::Misc(path, cause.to_string())),    
-    }      
+        Err(cause) => Err(ProcessingError::Misc(path, cause.to_string())),
+    }
 }
 
-fn receive_images(rx: Receiver<TimedImageResult>, settings: &ProgramSettings) 
+fn receive_images(rx: Receiver<TimedImageResult>, settings: &ProgramSettings)
     -> (Total, Vec<UniqueImage>, Vec<ProcessingError>){
     let mut unique_images = Vec::new();
     let mut errors = Vec::new();
     let mut total = 0u;
-   
+
     for img_result in rx.iter() {
         match img_result {
             Ok((image, _, _)) => {
@@ -256,14 +256,14 @@ fn receive_images(rx: Receiver<TimedImageResult>, settings: &ProgramSettings)
                 total += 1;
             },
             Err(img_err) => errors.push(img_err),
-        }                
+        }
     }
 
     (total, unique_images, errors)
 }
 
-pub fn manage_images(images: &mut Vec<UniqueImage>, 
-                 image: Image, settings: &ProgramSettings) { 
+pub fn manage_images(images: &mut Vec<UniqueImage>,
+                 image: Image, settings: &ProgramSettings) {
     let parent_idx = images
         .iter()
         .enumerate()
@@ -285,20 +285,19 @@ pub fn find_images(settings: &ProgramSettings) -> Vec<Path> {
         fs::walk_dir(&settings.dir)
             .unwrap()
             .filter(|file| check_ext(file, &*exts))
-            .collect()   
+            .collect()
     } else {
         fs::readdir(&settings.dir)
             .unwrap()
             .into_iter()
             .filter(|file| !file.is_dir() && check_ext(file, &*exts))
             .collect()
-    } 
+    }
 }
 
-fn check_ext(file: &Path, exts: &[&str]) -> bool {   
+fn check_ext(file: &Path, exts: &[&str]) -> bool {
     match file.extension_str() {
         Some(ext) => exts.iter().any(|&a| a.eq_ignore_ascii_case(ext)),
         None => false
     }
 }
-
