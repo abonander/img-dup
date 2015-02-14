@@ -4,26 +4,20 @@ name = "img_dup"
 version = "1.0.0"
 authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
-[features]
+[lib]
+name = "img_dup"
 
-gui = ["file_dialog", "pistoncore-sdl2_window", "conrod"]
+path = "src/lib.rs"
 
-[dependencies.time]
-git = "https://github.com/rust-lang/time"
+[[bin]]
+name = "img_dup"
 
-[dependencies.file_dialog]
-git = "https://github.com/cybergeek94/file_dialog"
-optional = true
+path = "src/bin/main.rs"
+
+[dependencies]
+log = "*"
+rustc-serialize = "*"
+time = "*"
 
 [dependencies.img_hash]
 git = "https://github.com/cybergeek94/img_hash"
-
-[dependencies.conrod]
-git = "https://github.com/PistonDevelopers/conrod"
-optional = true
-
-[dependencies.pistoncore-sdl2_window]
-git = "https://github.com/PistonDevelopers/sdl2_window"
-optional = true
-
-

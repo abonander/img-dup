@@ -18,7 +18,31 @@ use std::collections::BTreeMap;
 use std::io::IoResult;
 use std::io::fs::PathExtensions;
 use std::rt::unwind::try;
+use std::sync::atomic::{AtomicUsize, Relaxed};
 use std::thread::Thread;
+
+#[derive(Clone)]
+pub struct ParQueue {
+    vec: Arc<Vec<Path>>,
+    curr: Arc<AtomicUsize>,
+}
+
+impl ParQueue {
+    pub fn from_vec(vec: Vec<Path>) -> ParQueue {
+        ParQueue {
+            vec: Arc::new(vec),
+            curr: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl Iterator for ParQueue {
+    type Item = &Path;
+    fn next(&mut self) -> Option<&Path> {
+        let idx = self.curr.fetch_add(1, Relaxed);
+        self.vec.get(idx)
+    }
+}
 
 pub struct Results {
     pub total: Total,
@@ -111,8 +135,6 @@ pub enum ProcessingError {
     Decoding(Path, ImageError),
     Misc(Path, String),
 }
-
-unsafe impl Send for ProcessingError {}
 
 impl ProcessingError {
 
