@@ -6,7 +6,7 @@ use par_queue::ParQueue;
 use image;
 use image::{DynamicImage, GenericImage, ImageError};
 
-use img_hash::ImageHash;
+use img_hash::{ImageHash, HashType};
 
 use serialize::json::{ToJson, Json};
 
@@ -17,18 +17,19 @@ use std::boxed::BoxAny;
 use std::collections::BTreeMap;
 use std::io::IoResult;
 use std::io::fs::PathExtensions;
+use std::path::{Path, PathBuf};
 use std::rt::unwind::try;
 use std::sync::atomic::{AtomicUsize, Relaxed};
 use std::thread::Thread;
 
 #[derive(Clone)]
 pub struct ParQueue {
-    vec: Arc<Vec<Path>>,
+    vec: Arc<Vec<PathBuf>>,
     curr: Arc<AtomicUsize>,
 }
 
 impl ParQueue {
-    pub fn from_vec(vec: Vec<Path>) -> ParQueue {
+    pub fn from_vec(vec: Vec<PathBuf>) -> ParQueue {
         ParQueue {
             vec: Arc::new(vec),
             curr: AtomicUsize::new(0),
@@ -44,132 +45,29 @@ impl Iterator for ParQueue {
     }
 }
 
-pub struct Results {
+pub struct ImgResults {
     pub total: Total,
     pub start_time: Tm,
     pub end_time: Tm,
     pub uniques: Vec<UniqueImage>,
     pub errors: Vec<ProcessingError>,
 }
-
-unsafe impl Send for Results {}
-
-impl Results {
-
-    fn start_time(&self) -> String {
-        self.start_time.ctime().to_string()
-    }
-
-    fn end_time(&self) -> String {
-        self.end_time.ctime().to_string()
-    }
-
-    pub fn info_json(&self) -> Json {
-        let mut info = BTreeMap::new();
-        json_insert!(info, "start", self.start_time());
-        json_insert!(info, "end", self.end_time());
-        json_insert!(info, "found", self.total);
-        json_insert!(info, "processed", self.uniques.len());
-        json_insert!(info, "errors", self.errors.len());
-
-        Json::Object(info)
-    }
-
-    pub fn uniques_json(&self, relative_to: &Path, dup_only: bool) -> Json {
-        let uniques_json: Vec<Json> = self.uniques.iter()
-        .filter_map( |unique|
-                if dup_only && unique.similars.is_empty() {
-                    None
-                } else {
-                    Some(unique.to_json(relative_to))
-                }
-        ).collect();
-
-        Json::Array(uniques_json)
-    }
-
-    pub fn errors_json(&self, relative_to: &Path) -> Json {
-        let errors_json: Vec<Json> = self.errors.iter()
-            .map( |error| error.to_json(relative_to) )
-            .collect();
-
-        Json::Array(errors_json)
-    }
-
-    pub fn write_info(&self, out: &mut Writer) -> IoResult<()> {
-        try!(writeln!(out, "Start time: {}", self.start_time()));
-        try!(writeln!(out, "End time: {}", self.end_time()));
-        try!(writeln!(out, "Images found: {}", self.total));
-        try!(writeln!(out, "Processed: {}", self.uniques.len()));
-        writeln!(out, "Errors: {}", self.errors.len())
-    }
-
-    pub fn write_uniques(&self, out: &mut Writer, relative_to: &Path, dup_only: bool) -> IoResult<()> {
-        for unique in self.uniques.iter() {
-            if dup_only && unique.similars.is_empty() {
-                continue;
-            } else {
-                try!(
-                    newline_before_after(out,
-                        |outa| unique.write_self(outa, relative_to))
-                );
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn write_errors(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
-        for error in self.errors.iter() {
-            try!(
-                newline_before_after(out,
-                    |outa| error.write_self(outa, relative_to))
-            );
-        }
-
-        Ok(())
-    }
-}
+   
 
 pub enum ProcessingError {
-    Decoding(Path, ImageError),
-    Misc(Path, String),
+    Decoding(PathBuf, ImageError),
+    Misc(PathBuf, String),
 }
 
-impl ProcessingError {
-
-    pub fn relative_path(&self, relative_to: &Path) -> Path {
-        let path = match *self {
-            ProcessingError::Decoding(ref path, _) => path,
-            ProcessingError::Misc(ref path, _) => path,
-        };
-
-        path.path_relative_from(relative_to).unwrap_or(path.clone())
-    }
-
-    pub fn err_msg(&self) -> String {
-        match *self {
-            ProcessingError::Decoding(_, ref img_err) => format!("Loading error: {}", img_err),
-            ProcessingError::Misc(_, ref misc_err) => format!("Hashing error: {}", misc_err),
-        }
-    }
-
-    pub fn to_json(&self, relative_to: &Path) -> Json {
-        let mut json = BTreeMap::new();
-
-        json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
-        json_insert!(json, "error", self.err_msg());
-
-        Json::Object(json)
-    }
-
-    pub fn write_self(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
-        writeln!(out, "Image: {}\n {}\n", self.relative_path(relative_to).display().to_string(), self.err_msg())
-    }
+pub struct HashSettings {
+    pub hash_size: u32,
+    pub hash_type: HashType,
+    pub threshold: f32,
 }
 
 /// Nanoseconds
 pub type LoadTime = u64;
+/// Hash time of an image, in nanoseconds.
 pub type HashTime = u64;
 
 pub type ImageResult = Result<Image, ProcessingError>;
@@ -202,7 +100,7 @@ fn process_multithread(settings: &ProgramSettings, paths: Vec<Path>)
 pub fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
     -> Receiver<TimedImageResult> {
 
-    let work = ParQueue::from_vec(paths).into_iter();
+    let work = ParQueue::from_vec(paths);
 
     let (tx, rx) = channel();
 
@@ -218,7 +116,7 @@ pub fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
 
                 if task_tx.send_opt(img_result).is_err() { break; }
             }
-        }).detach();
+        });
     }
 
     rx
@@ -227,14 +125,14 @@ pub fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
 type ImageLoadResult = Result<DynamicImage, ImageError>;
 
 
-fn try_fn<'a, T, F: FnOnce() -> T>(f: F) -> Result<T, Box<&'a str>> {
+fn try_fn<T, F: FnOnce() -> T>(f: F) -> Result<T, String> {
     let mut maybe: Option<T> = None;
 
     let err = unsafe { try(|| maybe = Some(f())) };
 
     match maybe {
         Some(val) => Ok(val),
-        None => Err(err.unwrap_err().downcast::<&str>().unwrap()),
+        None => Err(err.unwrap_err().downcast().unwrap()),
     }
 }
 
@@ -298,28 +196,3 @@ pub fn manage_images(images: &mut Vec<UniqueImage>,
     }
 }
 
-pub fn find_images(settings: &ProgramSettings) -> Vec<Path> {
-    use std::io::fs;
-
-    let exts: Vec<&str> = settings.exts.iter().map(|string| string.as_slice()).collect();
-
-    if settings.recurse {
-        fs::walk_dir(&settings.dir)
-            .unwrap()
-            .filter(|file| check_ext(file, &*exts))
-            .collect()
-    } else {
-        fs::readdir(&settings.dir)
-            .unwrap()
-            .into_iter()
-            .filter(|file| !file.is_dir() && check_ext(file, &*exts))
-            .collect()
-    }
-}
-
-fn check_ext(file: &Path, exts: &[&str]) -> bool {
-    match file.extension_str() {
-        Some(ext) => exts.iter().any(|&a| a.eq_ignore_ascii_case(ext)),
-        None => false
-    }
-}
