@@ -1,45 +1,20 @@
 use img_hash::ImageHash;
 
-use serialize::json::{Json, ToJson};
-
-use std::collections::BTreeMap;
-use std::io::IoResult;
+use std::path::PathBuf;
 use std::mem;
-use std::path::Path;
+
+/// Nanoseconds
+pub type LoadTime = u64;
+/// Hash time of an image, in nanoseconds.
+pub type HashTime = u64;
 
 #[deriving(Eq, PartialEq, Clone)]
 pub struct Image {
-    pub path: Path,
+    pub path: PathBuf,
     pub hash: ImageHash,
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Image {
-
-    pub fn new(path: Path, hash: ImageHash, width: u32, height: u32) -> Image {
-        Image {
-            path: path,
-            hash: hash,
-            width: width,
-            height: height,
-        } 
-    }
-
-    fn relative_path(&self, relative_to: &Path) -> Path {
-        self.path.path_relative_from(relative_to).unwrap_or(self.path.clone())
-    }
-
-    pub fn to_treemap(&self, relative_to: &Path) -> BTreeMap<String, Json> {
-        let mut json = BTreeMap::new();
-
-        json_insert!(json, "path", self.relative_path(relative_to).display().to_string());
-        json_insert!(json, "hash", self.hash.to_base64());
-        json_insert!(json, "width", &self.width);
-        json_insert!(json, "height", &self.height);
-
-        json
-    }
+    pub dimensions: (u32, u32),
+    pub load_time: LoadTime,
+    pub hash_time: HashTime,
 }
 
 pub struct UniqueImage {
@@ -48,7 +23,6 @@ pub struct UniqueImage {
 }
 
 impl UniqueImage {
-
     pub fn from_image(img: Image) -> UniqueImage {
         UniqueImage {
            img: img,
@@ -66,39 +40,6 @@ impl UniqueImage {
         self.similars.push(SimilarImage::from_image(img, dist_ratio));
     }
 
-    pub fn similars(&self) -> Vec<SimilarImage> {
-        let mut temp = self.similars.clone();
-        temp.sort();
-        temp    
-    }
-
-    pub fn write_self(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
-        try!(writeln!(out, "Original: ({}x{}) {} ", 
-                    self.img.width, self.img.height,
-                    self.img.relative_path(relative_to).display()
-                ));
-        
-        try!(out.write_line("Similars [% different]:"));
-    
-        for similar in self.similars().iter() {
-            try!(similar.write_self(out, relative_to));
-        }
-
-        out.write_char('\n')
-    }
-
-    pub fn to_json(&self, relative_to: &Path) -> Json {
-        let mut json = self.img.to_treemap(relative_to);
-
-        let similars_json: Vec<Json> = self.similars.iter()
-            .map( |similar| similar.to_json(relative_to) )
-            .collect();
-
-        json_insert!(json, "similars", similars_json);
-
-        Json::Object(json)
-    }
-
     pub fn promote(&mut self, idx: uint) {
         mem::swap(&mut self.similars[idx].img, &mut self.img);
         for similar in self.similars.iter_mut() {
@@ -110,7 +51,7 @@ impl UniqueImage {
     } 
 }
 
-#[deriving(PartialEq, Clone)]
+#[deriving(PartialEq, Eq, Clone)]
 pub struct SimilarImage {
    pub img: Image, 
    // Distance from the containing UniqueImage
@@ -124,23 +65,7 @@ impl SimilarImage {
             img: img,
             dist_ratio: dist_ratio,
         }
-    }
-
-    fn write_self(&self, out: &mut Writer, relative_to: &Path) -> IoResult<()> {
-        writeln!(out, "[{0:.2}%] ({1}x{2}) {3}",
-            self.dist_ratio * 100f32,
-            self.img.width, self.img.height,
-            self.img.relative_path(relative_to).display()
-        )
-    }
-
-    fn to_json(&self, relative_to: &Path) -> Json {
-        let mut json = self.img.to_treemap(relative_to);
-
-        json_insert!(json, "diff", self.dist_ratio);
-
-        Json::Object(json)
-    }
+    } 
 }
 
 impl Ord for SimilarImage {
@@ -155,5 +80,32 @@ impl PartialOrd for SimilarImage {
     }    
 }
 
-impl Eq for SimilarImage {}
+pub struct ImageManager {
+    images: Vec<UniqueImage>,
+    threshold: f32,
+}
+
+impl ImageManager {
+    pub fn new(threshold: f32) -> Self {
+        ImageManager {
+            images: Vec::new(),
+            threshold: threshold,
+        }
+    }
+
+    pub fn add_image(&mut self, image: Image) {
+        let parent = images.iter_mut()
+            .find(|parent| parent.is_similar(&image, self.threshold));
+
+        if let Some(parent) = parent {
+            parent.add_similar(image);
+        } else {
+            self.images.push(UniqueImage::from_image(image);
+        }
+    }
+
+    pub fn into_vec(self) -> Vec<UniqueImage> {
+        self.images
+    }
+}
 

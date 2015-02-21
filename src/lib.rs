@@ -5,16 +5,22 @@
 
 extern crate "rustc-serialize" as serialize;
 extern crate img_hash;
+extern crate time;
 
 mod img;
-mod processing;
 
 use img_hash::HashType;
 
-pub use img::UniqueImage;
-pub use processing::{
-    ImgResults,
-    ProcessingError,
+use image;
+use image::{DynamicImage, GenericImage, ImageError};
+
+use time::{Tm, now, precise_time_ns};
+
+pub use img::{
+    HashTime,
+    Image, 
+    LoadTime,
+    UniqueImage
 };
 
 use std::borrow::ToOwned;
@@ -22,6 +28,13 @@ use std::fs::{self, DirEntry, PathExt};
 use std::io;
 use std::path::{AsPath, Path, PathBuf};
 use std::thread::Thread;
+use std::ascii::AsciiExt;
+use std::boxed::BoxAny;
+use std::io::IoResult;
+use std::io::fs::PathExtensions;
+use std::path::{Path, PathBuf};
+use std::rt::unwind::try;
+use std::sync::atomic::{AtomicUsize, Relaxed};
 
 macro_rules! setter {
     ($field:ident: $field_ty:ty) => (
@@ -79,7 +92,7 @@ impl ImageSearch {
     /// Any I/O errors during searching are safely filtered out.
     pub fn search(mut self) -> io::Result<Box<Iterator<Item=PathBuf>>> {
         /// Generic to permit code reuse
-        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>(mut iter: I, exts: &[&str] 
+        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>>(mut iter: I, exts: &[&str]) 
         -> Box<Iterator<Item=PathBuf>> {
             Box::new(
                 iter.filter_map(Result::ok)
@@ -92,10 +105,13 @@ impl ImageSearch {
             )
         }
 
-        match self.recursive {
+        // `match` instead of `if` for clarity
+        let iter = match self.recursive {
             false => do_filter(try!(fs::read_dir(self.dir))),
             true => do_filter(try!(fs::walk_dir(self.dir))),
-        }
+        };
+
+        Ok(iter)
     }
 }
 
@@ -153,7 +169,7 @@ impl SessionBuilder {
     /// If processing on a single background thread is preferred, use `spawn_background` instead.
     ///
     /// If you're going to be waiting for the result anyways, use `spawn_wait`, which spawns
-    /// multiple processing threads but performs collation locally..
+    /// multiple processing threads but performs collation in the current thread.
     ///
     /// ### Panics
     /// If `threads` is `Some(value)` and `value == 0`.
@@ -186,7 +202,7 @@ impl SessionBuilder {
     ///
     /// If `threads` is `None` and this method panics, then for some reason `std::os::num_cpus()`
     /// returned 0, which is probably bad.
-    pub fn spawn_wait(self, threads: Option<usize>) -> {
+    pub fn spawn_wait(self, threads: Option<usize>) -> ImgResults {
     
     }
 
@@ -203,5 +219,190 @@ pub struct Session {
 
 
 }
+
+
+
+
+
+
+
+
+;
+
+#[derive(Clone)]
+struct ParQueue {
+    vec: Arc<Vec<PathBuf>>,
+    curr: Arc<AtomicUsize>,
+}
+
+impl ParQueue {
+    fn from_vec(vec: Vec<PathBuf>) -> ParQueue {
+        ParQueue {
+            vec: Arc::new(vec),
+            curr: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl Iterator for ParQueue {
+    type Item = &Path;
+    fn next(&mut self) -> Option<&Path> {
+        let idx = self.curr.fetch_add(1, Relaxed);
+        self.vec.get(idx)
+    }
+}
+
+pub struct ImgResults {
+    pub total: Total,
+    pub start_time: Tm,
+    pub end_time: Tm,
+    pub uniques: Vec<UniqueImage>,
+    pub errors: Vec<ProcessingError>,
+}
+   
+
+
+
+pub struct HashSettings {
+    pub hash_size: u32,
+    pub hash_type: HashType,
+    pub threshold: f32,
+}
+
+
+
+pub type ImageResult = Result<Image, ProcessingError>;
+
+pub type TimedImageResult = Result<(Image, LoadTime, HashTime), ProcessingError>;
+
+pub type Total = uint;
+
+pub fn process(settings: &ProgramSettings, paths: Vec<Path>) -> Results {
+    let start_time = now();
+
+    let (total, uniques, errors) = process_multithread(settings, paths);
+
+    Results {
+        total: total,
+        start_time: start_time,
+        end_time: now(),
+        uniques: uniques,
+        errors: errors,
+    }
+}
+
+fn process_multithread(settings: &ProgramSettings, paths: Vec<Path>)
+    -> (Total, Vec<UniqueImage>, Vec<ProcessingError>) {
+    let rx = spawn_threads(settings, paths);
+
+    receive_images(rx, settings)
+}
+
+pub fn spawn_threads(settings: &ProgramSettings, paths: Vec<Path>)
+    -> Receiver<TimedImageResult> {
+
+    let work = ParQueue::from_vec(paths);
+
+    let (tx, rx) = channel();
+
+    let hash_settings = settings.hash_settings();
+
+    for _ in range(0, settings.threads) {
+        let task_tx = tx.clone();
+        let mut task_work = work.clone();
+
+        Thread::spawn(move || {
+            for path in task_work {
+                let img_result = load_and_hash_image(&hash_settings, path);
+
+                if task_tx.send_opt(img_result).is_err() { break; }
+            }
+        });
+    }
+
+    rx
+}
+
+pub type ImgDupResult<T> = Result<T, ImgDupError>;
+
+pub enum ImgDupError {
+    LoadingErr(PathBuf, ImageError),
+    LoadingPanic(PathBuf, String),
+    HashingPanic(PathBuf, String),
+}
+
+fn load_and_hash_image(settings: &HashSettings, path: &Path) -> ImgDupResult<Image> {
+    let (image, load_time) = try!(try_load_image(path));
+
+    let (hash, hash_time) = match try_hash_image {
+        Ok(ok) => ok,
+        Err(cause) => ImgDupError::HashingPanic(path.to_path_buf(), cause),
+    };
+
+    let (width, height) = img.dimensions();    
+    
+    Ok(
+        Image {
+            path: path.to_path_buf(),
+            hash: hash,
+            dimensions: img.dimensions(),
+            load_time: load_time,
+            hash_time: hash_time,
+        }
+    )
+}
+
+fn try_fn<T, F: FnOnce() -> T>(f: F) -> Result<T, String> {
+    let mut maybe: Option<T> = None;
+
+    let err = unsafe { try(|| maybe = Some(f())) };
+
+    match maybe {
+        Some(val) => Ok(val),
+        None => Err(err.unwrap_err().downcast().unwrap()),
+    }
+}
+
+
+fn try_load_image(path: &Path) -> ImgDupResult<(DynamicImage, LoadTime)> {
+    let start_load = precise_time_ns();
+    let image = try_fn(|| image::open(&path));
+    let load_time =  precise_time_ns() - start_load;
+
+    match image {
+        Ok(Ok(image)) => Ok((image, load_time)),
+        Ok(Err(img_err)) => Err(ImgDupError::LoadingErr(path.to_path_buf(), img_err)),
+        Err(cause) => Err(ImgDupError::LoadingPanic(path.to_path_buf(), cause)),
+    }
+}
+
+fn try_hash_image(img: &DynamicImage, hash_settings: &HashSettings) -> Result<(ImageHash, HashTime), String> {
+    let start_hash = precise_time_ns();
+    let hash = try!(try_fn(|| ImageHash::hash(img, hash_size, hash_typ)));
+    let hash_time = precise_time_ns() - start_hash;
+
+    Ok((hash, hash_time))
+}
+
+fn receive_images(rx: Receiver<TimedImageResult>, settings: &ProgramSettings)
+    -> (Total, Vec<UniqueImage>, Vec<ProcessingError>){
+    let mut unique_images = Vec::new();
+    let mut errors = Vec::new();
+    let mut total = 0u;
+
+    for img_result in rx.iter() {
+        match img_result {
+            Ok((image, _, _)) => {
+                manage_images(&mut unique_images, image, settings);
+                total += 1;
+            },
+            Err(img_err) => errors.push(img_err),
+        }
+    }
+
+    (total, unique_images, errors)
+}
+
+
 
 
