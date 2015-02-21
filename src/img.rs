@@ -1,20 +1,17 @@
 use img_hash::ImageHash;
 
-use std::path::PathBuf;
+use std::cmp::Ordering;
 use std::mem;
+use std::path::PathBuf;
+use std::time::Duration;
 
-/// Nanoseconds
-pub type LoadTime = u64;
-/// Hash time of an image, in nanoseconds.
-pub type HashTime = u64;
-
-#[deriving(Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone)]
 pub struct Image {
     pub path: PathBuf,
     pub hash: ImageHash,
     pub dimensions: (u32, u32),
-    pub load_time: LoadTime,
-    pub hash_time: HashTime,
+    pub load_time: Duration,
+    pub hash_time: Duration,
 }
 
 pub struct UniqueImage {
@@ -38,9 +35,10 @@ impl UniqueImage {
         let dist_ratio = self.img.hash.dist_ratio(&img.hash);
 
         self.similars.push(SimilarImage::from_image(img, dist_ratio));
+        self.similars.sort()
     }
 
-    pub fn promote(&mut self, idx: uint) {
+    pub fn promote(&mut self, idx: usize) {
         mem::swap(&mut self.similars[idx].img, &mut self.img);
         for similar in self.similars.iter_mut() {
             let dist_ratio = self.img.hash.dist_ratio(&similar.img.hash);
@@ -51,7 +49,7 @@ impl UniqueImage {
     } 
 }
 
-#[deriving(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct SimilarImage {
    pub img: Image, 
    // Distance from the containing UniqueImage
@@ -70,7 +68,7 @@ impl SimilarImage {
 
 impl Ord for SimilarImage {
     fn cmp(&self, other: &SimilarImage) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Equal)   
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)   
     }
 }
 
@@ -79,6 +77,8 @@ impl PartialOrd for SimilarImage {
         self.dist_ratio.partial_cmp(&other.dist_ratio)                    
     }    
 }
+
+impl Eq for SimilarImage {}
 
 pub struct ImageManager {
     images: Vec<UniqueImage>,
@@ -94,13 +94,13 @@ impl ImageManager {
     }
 
     pub fn add_image(&mut self, image: Image) {
-        let parent = images.iter_mut()
+        let parent = self.images.iter_mut()
             .find(|parent| parent.is_similar(&image, self.threshold));
 
         if let Some(parent) = parent {
             parent.add_similar(image);
         } else {
-            self.images.push(UniqueImage::from_image(image);
+            self.images.push(UniqueImage::from_image(image));
         }
     }
 

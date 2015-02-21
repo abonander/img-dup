@@ -6,18 +6,18 @@ authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
 [lib]
 name = "img_dup"
-
 path = "src/lib.rs"
 
 [[bin]]
 name = "img_dup"
-
 path = "src/bin/main.rs"
 
 [dependencies]
 log = "*"
 rustc-serialize = "*"
-time = "*"
 
 [dependencies.img_hash]
 git = "https://github.com/cybergeek94/img_hash"
+
+[dependencies.image]
+git = "https://github.com/PistonDevelopers/image"

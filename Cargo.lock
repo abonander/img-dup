@@ -2,16 +2,11 @@
 name = "img_dup"
 version = "1.0.0"
 dependencies = [
+ "image 0.2.0-alpha.10 (git+https://github.com/PistonDevelopers/image.git)",
  "img_hash 0.1.0 (git+https://github.com/cybergeek94/img_hash)",
  "log 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
- "time 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
-
-[[package]]
-name = "gcc"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "image"
@@ -62,13 +57,4 @@ dependencies = [
 name = "rustc-serialize"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "time"
-version = "0.1.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "gcc 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
