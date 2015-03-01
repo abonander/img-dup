@@ -4,6 +4,9 @@ name = "img_dup_ui"
 version = "0.0.1"
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
+[dependencies.img_dup]
+path = "../"
+
 [dependencies.file_dialog]
 git = "https://github.com/cybergeek94/file_dialog"
 
