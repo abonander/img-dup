@@ -94,14 +94,16 @@ impl ImageManager {
     }
 
     pub fn add_image(&mut self, image: Image) {
-        let parent = self.images.iter_mut()
-            .find(|parent| parent.is_similar(&image, self.threshold));
+        let threshold = self.threshold;
 
-        if let Some(parent) = parent {
-            parent.add_similar(image);
-        } else {
-            self.images.push(UniqueImage::from_image(image));
+        match self.images.iter_mut().find(|parent| parent.is_similar(&image, threshold)) {
+            Some(parent) => {                
+                parent.add_similar(image);
+                None
+            },
+            None => Some(image),
         }
+        .map(|image| self.images.push(UniqueImage::from_image(image)));
     }
 
     pub fn into_vec(self) -> Vec<UniqueImage> {

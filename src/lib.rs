@@ -2,6 +2,7 @@
 //! parallel, and collating their hashes to find near or complete duplicates.
 //!
 //!
+#![feature(collections, fs, io, old_path, os, path, std_misc)]
 
 extern crate "rustc-serialize" as serialize;
 extern crate img_hash;
@@ -21,10 +22,8 @@ use img_hash::{HashType, ImageHash};
 
 use image::{DynamicImage, GenericImage, ImageError};
 
-use std::ascii::AsciiExt;
 use std::borrow::ToOwned;
-use std::boxed::BoxAny;
-use std::fs::{self, DirEntry, PathExt};
+use std::fs::{self, DirEntry};
 use std::io;
 use std::path::{AsPath, Path, PathBuf};
 use std::rt::unwind::try;
@@ -86,9 +85,9 @@ impl<'a> ImageSearch<'a> {
     /// Returns a vector of all found images as paths.
     ///
     /// Any I/O errors during searching are safely filtered out.
-    pub fn search(mut self) -> io::Result<Vec<PathBuf>> {
+    pub fn search(self) -> io::Result<Vec<PathBuf>> {
         /// Generic to permit code reuse
-        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>>(mut iter: I, exts: &[&str]) -> Vec<PathBuf> {
+        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>>(iter: I, exts: &[&str]) -> Vec<PathBuf> {
                 iter.filter_map(|res| res.ok())
                     .map(|entry| entry.path())
                     .filter(|path|
@@ -170,51 +169,36 @@ impl SessionBuilder {
     /// ### Note
     /// Regardless of the `threads` value, an additional thread will be used for result collation.
     ///
-    /// If processing on a single background thread is preferred, use `spawn_background` instead.
-    ///
-    /// If you're going to be waiting for the result anyways, use `spawn_wait`, which spawns
-    /// multiple processing threads but performs collation in the current thread.
-    ///
     /// ### Panics
     /// If `threads` is `Some(value)` and `value == 0`.
     ///
     /// If `threads` is `None` and this method panics, then for some reason `std::os::num_cpus()`
     /// returned 0, which is probably bad.
-    pub fn spawn_multithread(self, threads: Option<usize>) -> Session {
-        let threads = threads.unwrap_or_else(std::os::num_cpus);
-        assert!(threads > 0, "If `threads` is supplied, it must be nonzero!");
-
-
-    }
-
-    /// Spawn an `img_dup` session which performs all the processing and collation
-    /// on a single background thread.
-    ///
-    /// Not recommended unless you only want to spawn one thread but don't want to block
-    /// in the current one.
-    pub fn process_background(self) -> Session {
-
-    }
-
-    /// Perform the processing in the background but collate in the current thread,
-    /// and return the result when it is ready.
-    ///
-    /// See `spawn_multithread` for more information on the `threads` parameter.
-    ///
-    /// ### Panics
-    /// If `threads` is `Some(value)` and `value == 0`.
-    ///
-    /// If `threads` is `None` and this method panics, then for some reason `std::os::num_cpus()`
-    /// returned 0, which is probably bad.
-    pub fn spawn_wait(self, threads: Option<usize>) -> ImgResults {
-
-    }
+    pub fn process_multithread(self, threads: Option<usize>) -> Session {
+        let (settings, images) = self.recombine();
+        Session::process_multithread(threads, settings, images)
+    } 
 
     /// Do all the processing and collation on the current thread and return the result directly.
     ///
     /// **Not** recommended unless avoiding extra threads altogether is somehow desirable.
     pub fn process_local(self) -> ImgResults {
+        let (settings, images) = self.recombine();
 
+        let mut manager = ImageManager::new(settings.threshold);
+        let mut errors = Vec::new(); 
+
+        for image in images {
+            match load_and_hash_image(settings, &image) {
+                Ok(hashed_image) => manager.add_image(hashed_image),
+                Err(img_err) => errors.push(img_err),
+            }
+        }
+
+        ImgResults {
+            uniques: manager.into_vec(),
+            errors: errors,
+        }
     }
 
     fn recombine(self) -> (HashSettings, Vec<PathBuf>) {
@@ -229,18 +213,32 @@ impl SessionBuilder {
 }
 
 pub struct Session {
-    background: JoinGuard<'static, ImgResults>,
+    background: thread::JoinGuard<'static, ImgResults>,
     pub total: usize,
     pub status: RunningStatus,
 }
 
 impl Session {
     fn process_multithread(threads: Option<usize>, settings: HashSettings, images: Vec<PathBuf>) -> Self {
+        let threads = threads.unwrap_or_else(std::os::num_cpus);
+        assert!(threads > 0, "If `threads` is supplied, it must be nonzero!");
 
+        let total = images.len();
+        let result_rx = spawn_threads(threads, settings, images);
+        let status = RunningStatus::new();
+        let move_status = status.clone();
+
+        let background = thread::scoped(move || collect_images(result_rx, settings.threshold, move_status));
+
+        Session {
+            background: background,
+            total: total,
+            status: status,
+        }
     }
 
-    fn process_background(settings: HashSettings, image: Vec<PathBuf>) {
-
+    pub fn wait(self) -> ImgResults {
+        self.background.join()
     }
 }
 
@@ -319,11 +317,11 @@ fn spawn_threads(threads: usize, settings: HashSettings, paths: Vec<PathBuf>) ->
 
     let (tx, rx) = channel();
 
-    for _ in range(0, threads) {
+    for _ in 0 .. threads {
         let task_tx = tx.clone();
-        let mut task_queue = queue.clone();
+        let task_queue = queue.clone();
 
-        Thread::spawn(move || {
+        thread::spawn(move || {
             while let Some(path) = task_queue.next() {
                 let img_result = load_and_hash_image(settings, path);
 
@@ -335,7 +333,7 @@ fn spawn_threads(threads: usize, settings: HashSettings, paths: Vec<PathBuf>) ->
     rx
 }
 
-fn collect_images(rx: Receiver<ImageResult>, threshold: f32, status: Option<RunningStatus>) -> ImgResults {
+fn collect_images(rx: Receiver<ImageResult>, threshold: f32, status: RunningStatus) -> ImgResults {
     let mut manager = ImageManager::new(threshold);
     let mut errors = Vec::new();
 
@@ -343,11 +341,11 @@ fn collect_images(rx: Receiver<ImageResult>, threshold: f32, status: Option<Runn
         match img_result {
             Ok(image) => {
                 manager.add_image(image);
-                status.as_ref().map(RunningStatus::add_done);
+                status.add_done();
             },
             Err(img_err) => {
                 errors.push(img_err);
-                status.as_ref().map(RunningStatus::add_error);
+                status.add_error();
             }
         }
     }
@@ -392,7 +390,7 @@ fn try_fn<T, F: FnOnce() -> T>(f: F) -> Result<T, String> {
 
     match maybe {
         Some(val) => Ok(val),
-        None => Err(err.unwrap_err().downcast().unwrap()),
+        None => Err(format!("{:?}", err.unwrap_err())),
     }
 }
 
@@ -402,8 +400,13 @@ fn duration_with_val<T, F: FnOnce() -> T>(f: F) -> (T, Duration) {
     (opt_val.unwrap(), duration)
 }
 
+fn image_open(path: &Path) -> image::ImageResult<DynamicImage> {
+    let ref path = ::std::old_path::Path::new(path.to_str().unwrap());
+    image::open(path)
+}
+
 fn try_load_image(path: &Path) -> ImgDupResult<(DynamicImage, Duration)> {
-    let (image, load_time) =  duration_with_val(|| try_fn(|| image::open(&path)));
+    let (image, load_time) =  duration_with_val(|| try_fn(|| image_open(&path)));
 
     match image {
         Ok(Ok(image)) => Ok((image, load_time)),

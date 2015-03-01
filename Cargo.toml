@@ -4,14 +4,6 @@ name = "img_dup"
 version = "1.0.0"
 authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
-[lib]
-name = "img_dup"
-path = "src/lib.rs"
-
-[[bin]]
-name = "img_dup"
-path = "src/bin/main.rs"
-
 [dependencies]
 log = "*"
 rustc-serialize = "*"
