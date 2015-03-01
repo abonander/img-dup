@@ -1,0 +1,15 @@
+[package]
+
+name = "img_dup"
+version = "1.0.0"
+authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
+
+[dependencies]
+log = "*"
+rustc-serialize = "*"
+
+[dependencies.img_hash]
+path = "../"
+
+[dependencies.image]
+git = "https://github.com/PistonDevelopers/image"
