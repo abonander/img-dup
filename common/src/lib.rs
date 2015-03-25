@@ -7,6 +7,7 @@
 extern crate "rustc-serialize" as serialize;
 extern crate img_hash;
 extern crate image;
+extern crate threadpool;
 
 mod img;
 
@@ -36,78 +37,7 @@ use std::thread;
 
 
 
-pub static DEFAULT_EXTS: &'static [&'static str] = &["jpg", "png", "gif"];
 
-/// A helper struct for searching for image files within a directory.
-pub struct ImageSearch<'a> {
-    /// The directory to search
-    pub dir: &'a Path,
-    /// If the search should be recursive (visit subdirectories)
-    pub recursive: bool,
-    /// The extensions to match.
-    pub exts: Vec<&'a str>,
-}
-
-impl<'a> ImageSearch<'a> {
-    /// Initiate a search builder with the base search directory.
-    /// Starts with a copy of `DEFAULT_EXTS` for the list of file extensions,
-    /// and `recursive` set to `false`.
-    pub fn with_dir<P: AsPath>(dir: &'a P) -> ImageSearch<'a> {
-        ImageSearch {
-            dir: dir.as_path(),
-            recursive: false,
-            exts: DEFAULT_EXTS.to_owned(),
-        }
-    }
-
-    pub fn recursive(&mut self, recursive: bool) -> &mut ImageSearch<'a> {
-        self.recursive = recursive;
-        self
-    }
-
-    /// Add an extension to the list on `self`,
-    /// returning `self` for method chaining
-    pub fn ext(&mut self, ext: &'a str) -> &mut ImageSearch<'a> {
-        self.exts.push(ext);
-        self
-    }
-
-    /// Add all the extensions from `exts` to `self,
-    /// returning `self` for method chaining
-    pub fn exts(&mut self, exts: &[&'a str]) -> &mut ImageSearch<'a> {
-        self.exts.push_all(exts);
-        self
-    }
-
-    /// Searche `self.dir` for images with extensions contained in `self.exts`,
-    /// recursing into subdirectories if `self.recursive` is set to `true`.
-    ///
-    /// Returns a vector of all found images as paths.
-    ///
-    /// Any I/O errors during searching are safely filtered out.
-    pub fn search(self) -> io::Result<Vec<PathBuf>> {
-        /// Generic to permit code reuse
-        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>>(iter: I, exts: &[&str]) -> Vec<PathBuf> {
-                iter.filter_map(|res| res.ok())
-                    .map(|entry| entry.path())
-                    .filter(|path|
-                        path.extension()
-                            .and_then(|s| s.to_str())
-                            .map(|ext| exts.contains(&ext))
-                            .unwrap_or(false)
-                    )
-                    .collect()
-        }
-
-        // `match` instead of `if` for clarity
-        let paths = match self.recursive {
-            false => do_filter(try!(fs::read_dir(self.dir)), &self.exts),
-            true => do_filter(try!(fs::walk_dir(self.dir)), &self.exts),
-        };
-
-        Ok(paths)
-    }
-}
 
 pub const DEAFULT_HASH_SIZE: u32 = 16;
 pub const DEFAULT_HASH_TYPE: HashType = HashType::Gradient;
@@ -212,10 +142,31 @@ impl SessionBuilder {
     }
 }
 
+fn spawn_threads(threads: usize, settings: HashSettings, paths: Vec<PathBuf>) -> Receiver<ImageResult> {
+    let queue = ParQueue::from_vec(paths);
+
+    let (tx, rx) = channel();
+
+    for _ in 0 .. threads {
+        let task_tx = tx.clone();
+        let task_queue = queue.clone();
+
+        thread::spawn(move || {
+            while let Some(path) = task_queue.next() {
+                let img_result = load_and_hash_image(settings, path);
+
+                if task_tx.send(img_result).is_err() { break; }
+            }
+        });
+    }
+
+    rx
+}
+
 pub struct Session {
     background: thread::JoinGuard<'static, ImgResults>,
     pub total: usize,
-    pub status: RunningStatus,
+    pub status: Arc<RunningStatus>,
 }
 
 impl Session {
@@ -244,15 +195,15 @@ impl Session {
 
 #[derive(Clone)]
 pub struct RunningStatus {
-    done: Arc<AtomicUsize>,
-    errors: Arc<AtomicUsize>,
+    done: AtomicUsize,
+    errors: AtomicUsize,
 }
 
 impl RunningStatus {
     fn new() -> Self {
         RunningStatus {
-            done: Arc::new(AtomicUsize::new(0)),
-            errors: Arc::new(AtomicUsize::new(0)),
+            done: AtomicUsize::new(0),
+            errors: AtomicUsize::new(0),
         }
     }
 
@@ -277,23 +228,36 @@ impl RunningStatus {
     }
 }
 
-#[derive(Clone)]
-struct ParQueue {
-    vec: Arc<Vec<PathBuf>>,
-    curr: Arc<AtomicUsize>,
+enum ImgStatus {
+    Unhashed(PathBuf),
+    Hashed(Image),
+    Error(PathBuf, ImageError),
 }
 
-impl ParQueue {
+impl ImgStatus {
+    fn hash(&mut self, status: &RunningStatus, settings: HashSettings) {
+        let result = if let ImgStatus::Unhashed(path) = *self {
+        
+        }
+    }
+}
+
+struct HashQueue {
+    vec: Vec<ImgStatus>,
+    curr: AtomicUsize,
+}
+
+impl HashQueue {
     fn from_vec(vec: Vec<PathBuf>) -> ParQueue {
         ParQueue {
-            vec: Arc::new(vec),
-            curr: Arc::new(AtomicUsize::new(0)),
+            vec: vec.into_iter().map(|path| ImgStatus::Unhashed(path)).collect(),
+            curr: AtomicUsize::new(0),
         }
     }
 
-    fn next<'a>(&'a self) -> Option<&'a Path> {
+    fn next(&self) -> Option<&mut ImgStatus> {
         let idx = self.curr.fetch_add(1, Relaxed);
-        self.vec.get(idx).map(|pathbuf| &**pathbuf)
+        self.vec.get(idx).map(|img| unsafe { &mut *(img as *const T as *mut T) })
     }
 }
 
@@ -310,51 +274,6 @@ struct HashSettings {
 }
 
 
-type ImageResult = ImgDupResult<Image>;
-
-fn spawn_threads(threads: usize, settings: HashSettings, paths: Vec<PathBuf>) -> Receiver<ImageResult> {
-    let queue = ParQueue::from_vec(paths);
-
-    let (tx, rx) = channel();
-
-    for _ in 0 .. threads {
-        let task_tx = tx.clone();
-        let task_queue = queue.clone();
-
-        thread::spawn(move || {
-            while let Some(path) = task_queue.next() {
-                let img_result = load_and_hash_image(settings, path);
-
-                if task_tx.send(img_result).is_err() { break; }
-            }
-        });
-    }
-
-    rx
-}
-
-fn collect_images(rx: Receiver<ImageResult>, threshold: f32, status: RunningStatus) -> ImgResults {
-    let mut manager = ImageManager::new(threshold);
-    let mut errors = Vec::new();
-
-    for img_result in rx.iter() {
-        match img_result {
-            Ok(image) => {
-                manager.add_image(image);
-                status.add_done();
-            },
-            Err(img_err) => {
-                errors.push(img_err);
-                status.add_error();
-            }
-        }
-    }
-
-    ImgResults {
-        uniques: manager.into_vec(),
-        errors: errors,
-    }
-}
 
 pub type ImgDupResult<T> = Result<T, ImgDupError>;
 
@@ -383,17 +302,6 @@ fn load_and_hash_image(settings: HashSettings, path: &Path) -> ImgDupResult<Imag
     )
 }
 
-fn try_fn<T, F: FnOnce() -> T>(f: F) -> Result<T, String> {
-    let mut maybe: Option<T> = None;
-
-    let err = unsafe { try(|| maybe = Some(f())) };
-
-    match maybe {
-        Some(val) => Ok(val),
-        None => Err(format!("{:?}", err.unwrap_err())),
-    }
-}
-
 fn duration_with_val<T, F: FnOnce() -> T>(f: F) -> (T, Duration) {
     let mut opt_val: Option<T> = None;
     let duration = Duration::span(|| opt_val = Some(f()));
@@ -405,20 +313,4 @@ fn image_open(path: &Path) -> image::ImageResult<DynamicImage> {
     image::open(path)
 }
 
-fn try_load_image(path: &Path) -> ImgDupResult<(DynamicImage, Duration)> {
-    let (image, load_time) =  duration_with_val(|| try_fn(|| image_open(&path)));
-
-    match image {
-        Ok(Ok(image)) => Ok((image, load_time)),
-        Ok(Err(img_err)) => Err(ImgDupError::LoadingErr(path.to_path_buf(), img_err)),
-        Err(cause) => Err(ImgDupError::LoadingPanic(path.to_path_buf(), cause)),
-    }
-}
-
-fn try_hash_image(img: &DynamicImage, settings: HashSettings) -> Result<(ImageHash, Duration), String> {
-    let HashSettings { hash_size, hash_type, .. }  = settings;
-    let (hash, hash_time) = duration_with_val(|| try_fn(|| ImageHash::hash(img, hash_size, hash_type)));
-    let hash = try!(hash);
-
-    Ok((hash, hash_time))
 }

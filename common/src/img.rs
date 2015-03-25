@@ -27,54 +27,54 @@ impl UniqueImage {
         }
     }
     
-    pub fn is_similar(&self, img: &Image, thresh: f32) -> bool {
-        self.img.hash.dist_ratio(&img.hash) < thresh
+    pub fn is_similar(&self, img: &Image, thresh: usize) -> bool {
+        self.img.hash.dist(&img.hash) < thresh
     }
  
     pub fn add_similar(&mut self, img: Image) {
-        let dist_ratio = self.img.hash.dist_ratio(&img.hash);
+        let dist = self.img.hash.dist(&img.hash);
 
-        self.similars.push(SimilarImage::from_image(img, dist_ratio));
+        self.similars.push(SimilarImage::from_image(img, dist));
         self.similars.sort()
     }
 
     pub fn promote(&mut self, idx: usize) {
         mem::swap(&mut self.similars[idx].img, &mut self.img);
         for similar in self.similars.iter_mut() {
-            let dist_ratio = self.img.hash.dist_ratio(&similar.img.hash);
-            similar.dist_ratio = dist_ratio;
+            let dist = self.img.hash.dist(&similar.img.hash);
+            similar.dist = dist;
         }
         
         self.similars.sort()
     } 
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct SimilarImage {
    pub img: Image, 
    // Distance from the containing UniqueImage
-   pub dist_ratio: f32,
+   pub dist: usize,
 }
 
 impl SimilarImage {
 
-    fn from_image(img: Image, dist_ratio: f32) -> SimilarImage {
+    fn from_image(img: Image, dist: usize) -> SimilarImage {
         SimilarImage {
             img: img,
-            dist_ratio: dist_ratio,
+            dist: dist,
         }
     } 
 }
 
 impl Ord for SimilarImage {
     fn cmp(&self, other: &SimilarImage) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)   
+        self.dist.cmp(other.dist)   
     }
 }
 
 impl PartialOrd for SimilarImage {
     fn partial_cmp(&self, other: &SimilarImage) -> Option<Ordering> {
-        self.dist_ratio.partial_cmp(&other.dist_ratio)                    
+        Some(self.cmp(other))
     }    
 }
 
@@ -82,11 +82,11 @@ impl Eq for SimilarImage {}
 
 pub struct ImageManager {
     images: Vec<UniqueImage>,
-    threshold: f32,
+    threshold: usize,
 }
 
 impl ImageManager {
-    pub fn new(threshold: f32) -> Self {
+    pub fn new(threshold: usize) -> Self {
         ImageManager {
             images: Vec::new(),
             threshold: threshold,

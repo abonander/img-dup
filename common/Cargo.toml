@@ -1,15 +1,18 @@
 [package]
 
-name = "img_dup"
+name = "img_dup_common"
 version = "1.0.0"
 authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
 [dependencies]
 log = "*"
 rustc-serialize = "*"
+threadpool = "*"
 
 [dependencies.img_hash]
-path = "../"
+git = "https://github.com/cybergeek94/img_hash"
 
 [dependencies.image]
 git = "https://github.com/PistonDevelopers/image"
+
+

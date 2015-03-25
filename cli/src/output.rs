@@ -1,3 +1,5 @@
+extern crate img_dup_common as common;
+
 use config::{ProgramSettings, JsonSettings};
 use processing::Results;
 

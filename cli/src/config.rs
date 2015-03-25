@@ -13,7 +13,7 @@ use std::io::fs::PathExtensions;
 
 use std::os;
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct ProgramSettings {
     pub threads: uint,
     pub dir: Path,
