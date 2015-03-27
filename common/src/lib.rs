@@ -2,46 +2,115 @@
 //! parallel, and collating their hashes to find near or complete duplicates.
 //!
 //!
-#![feature(collections, fs, io, old_path, os, path, std_misc)]
+#![feature(collections, convert, fs_walk, std_misc)]
 
-extern crate "rustc-serialize" as serialize;
+extern crate rustc_serialize as serialize;
 extern crate img_hash;
 extern crate image;
-extern crate threadpool;
+extern crate num_cpus;
 
+mod compare;
 mod img;
+mod threaded;
 
-use img::ImageManager;
+use compare::ImageManager;
 
-pub use img::{
-    Image,
-    SimilarImage,
-    UniqueImage
+pub use compare::UniqueImage;
+
+use img::{
+	ImgResults,
+	ImgStatus,
+	HashSettings,
 };
 
-use img_hash::{HashType, ImageHash};
+pub use img::Image;
 
-use image::{DynamicImage, GenericImage, ImageError};
+use threaded::ThreadedSession;
+
+use img_hash::HashType;
 
 use std::borrow::ToOwned;
+use std::convert::AsRef;
 use std::fs::{self, DirEntry};
 use std::io;
-use std::path::{AsPath, Path, PathBuf};
-use std::rt::unwind::try;
-use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::Relaxed;
-use std::sync::mpsc::{channel, Receiver};
-use std::time::Duration;
-use std::thread;
+use std::path::{Path, PathBuf};
 
+pub static DEFAULT_EXTS: &'static [&'static str] = &["jpg", "png", "gif"];
 
+/// A helper struct for searching for image files within a directory.
+pub struct ImageSearch<'a> {
+    /// The directory to search
+    pub dir: &'a Path,
+    /// If the search should be recursive (visit subdirectories)
+    pub recursive: bool,
+    /// The extensions to match.
+    pub exts: Vec<&'a str>,
+}
 
+impl<'a> ImageSearch<'a> {
+    /// Initiate a search builder with the base search directory.
+    /// Starts with a copy of `DEFAULT_EXTS` for the list of file extensions,
+    /// and `recursive` set to `false`.
+    pub fn with_dir<P: AsRef<Path>>(dir: &'a P) -> ImageSearch<'a> {
+        ImageSearch {
+            dir: dir.as_ref(),
+            recursive: false,
+            exts: DEFAULT_EXTS.to_owned(),
+        }
+    }
 
+    pub fn recursive(&mut self, recursive: bool) -> &mut ImageSearch<'a> {
+        self.recursive = recursive;
+        self
+    }
+
+    /// Add an extension to the list on `self`,
+    /// returning `self` for method chaining
+    pub fn ext(&mut self, ext: &'a str) -> &mut ImageSearch<'a> {
+        self.exts.push(ext);
+        self
+    }
+
+    /// Add all the extensions from `exts` to `self,
+    /// returning `self` for method chaining
+    pub fn exts(&mut self, exts: &[&'a str]) -> &mut ImageSearch<'a> {
+        self.exts.push_all(exts);
+        self
+    }
+
+    /// Searche `self.dir` for images with extensions contained in `self.exts`,
+    /// recursing into subdirectories if `self.recursive` is set to `true`.
+    ///
+    /// Returns a vector of all found images as paths.
+    ///
+    /// Any I/O errors during searching are safely filtered out.
+    pub fn search(self) -> io::Result<Vec<PathBuf>> {
+        /// Generic to permit code reuse
+        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>>(iter: I, exts: &[&str]) -> Vec<PathBuf> {
+                iter.filter_map(|res| res.ok())
+                    .map(|entry| entry.path())
+                    .filter(|path|
+                        path.extension()
+                            .and_then(|s| s.to_str())
+                            .map(|ext| exts.contains(&ext))
+                            .unwrap_or(false)
+                    )
+                    .collect()
+        }
+
+        // `match` instead of `if` for clarity
+        let paths = match self.recursive {
+            false => do_filter(try!(fs::read_dir(self.dir)), &self.exts),
+            true => do_filter(try!(fs::walk_dir(self.dir)), &self.exts),
+        };
+
+        Ok(paths)
+    }
+}
 
 pub const DEAFULT_HASH_SIZE: u32 = 16;
 pub const DEFAULT_HASH_TYPE: HashType = HashType::Gradient;
-pub const DEFAULT_THRESHOLD: f32 = 0.03;
+pub const DEFAULT_THRESHOLD: u32 = 2;
 
 /// A builder struct for bootstrapping an `img_dup` session.
 pub struct SessionBuilder {
@@ -57,12 +126,6 @@ pub struct SessionBuilder {
 
     /// The type of the hash to use. See `HashType` for more information.
     pub hash_type: HashType,
-
-    /// The percent (%) difference an image has to be from all others
-    /// to count as unique, expressed as a decimal.
-    ///
-    /// E.g. a 3% threshold should be set as `0.03`.
-    pub threshold: f32,
 }
 
 macro_rules! setter {
@@ -85,13 +148,11 @@ impl SessionBuilder {
             images: images,
             hash_size: DEAFULT_HASH_SIZE,
             hash_type: DEFAULT_HASH_TYPE,
-            threshold: DEFAULT_THRESHOLD,
         }
     }
 
     setter! { hash_size: u32 }
     setter! { hash_type: HashType }
-    setter! { threshold: f32 }
 
     /// Spawn an `img_dup` session, using `threads` if supplied,
     /// or the number of CPUs as reported by the OS otherwise (recommended).
@@ -104,9 +165,9 @@ impl SessionBuilder {
     ///
     /// If `threads` is `None` and this method panics, then for some reason `std::os::num_cpus()`
     /// returned 0, which is probably bad.
-    pub fn process_multithread(self, threads: Option<usize>) -> Session {
+    pub fn process_multithread(self, threads: Option<usize>) -> ThreadedSession {
         let (settings, images) = self.recombine();
-        Session::process_multithread(threads, settings, images)
+        ThreadedSession::process_multithread(threads, settings, images)
     } 
 
     /// Do all the processing and collation on the current thread and return the result directly.
@@ -115,202 +176,27 @@ impl SessionBuilder {
     pub fn process_local(self) -> ImgResults {
         let (settings, images) = self.recombine();
 
-        let mut manager = ImageManager::new(settings.threshold);
-        let mut errors = Vec::new(); 
+        let mut results: Vec<_> = images.into_iter()
+			.map(|img| ImgStatus::Unhashed(img))
+			.collect();
 
-        for image in images {
-            match load_and_hash_image(settings, &image) {
-                Ok(hashed_image) => manager.add_image(hashed_image),
-                Err(img_err) => errors.push(img_err),
-            }
-        }
+		let _ = results.iter_mut().map(|img| img.hash(settings)).last();
 
-        ImgResults {
-            uniques: manager.into_vec(),
-            errors: errors,
-        }
+		ImgResults::from_statuses(results)
     }
 
     fn recombine(self) -> (HashSettings, Vec<PathBuf>) {
         let hash_settings = HashSettings {
             hash_size: self.hash_size,
             hash_type: self.hash_type,
-            threshold: self.threshold,
         };
 
         (hash_settings, self.images)
     }
 }
 
-fn spawn_threads(threads: usize, settings: HashSettings, paths: Vec<PathBuf>) -> Receiver<ImageResult> {
-    let queue = ParQueue::from_vec(paths);
-
-    let (tx, rx) = channel();
-
-    for _ in 0 .. threads {
-        let task_tx = tx.clone();
-        let task_queue = queue.clone();
-
-        thread::spawn(move || {
-            while let Some(path) = task_queue.next() {
-                let img_result = load_and_hash_image(settings, path);
-
-                if task_tx.send(img_result).is_err() { break; }
-            }
-        });
-    }
-
-    rx
-}
-
-pub struct Session {
-    background: thread::JoinGuard<'static, ImgResults>,
-    pub total: usize,
-    pub status: Arc<RunningStatus>,
-}
-
-impl Session {
-    fn process_multithread(threads: Option<usize>, settings: HashSettings, images: Vec<PathBuf>) -> Self {
-        let threads = threads.unwrap_or_else(std::os::num_cpus);
-        assert!(threads > 0, "If `threads` is supplied, it must be nonzero!");
-
-        let total = images.len();
-        let result_rx = spawn_threads(threads, settings, images);
-        let status = RunningStatus::new();
-        let move_status = status.clone();
-
-        let background = thread::scoped(move || collect_images(result_rx, settings.threshold, move_status));
-
-        Session {
-            background: background,
-            total: total,
-            status: status,
-        }
-    }
-
-    pub fn wait(self) -> ImgResults {
-        self.background.join()
-    }
-}
-
-#[derive(Clone)]
-pub struct RunningStatus {
-    done: AtomicUsize,
-    errors: AtomicUsize,
-}
-
-impl RunningStatus {
-    fn new() -> Self {
-        RunningStatus {
-            done: AtomicUsize::new(0),
-            errors: AtomicUsize::new(0),
-        }
-    }
-
-    pub fn done(&self) -> usize {
-        self.done.load(Relaxed)
-    }
-
-    pub fn errors(&self) -> usize {
-        self.errors.load(Relaxed)
-    }
-
-    pub fn total(&self) -> usize {
-        self.done() + self.errors()
-    }
-
-    fn add_done(&self) {
-        self.done.fetch_add(1, Relaxed);
-    }
-
-    fn add_error(&self) {
-        self.errors.fetch_add(1, Relaxed);
-    }
-}
-
-enum ImgStatus {
-    Unhashed(PathBuf),
-    Hashed(Image),
-    Error(PathBuf, ImageError),
-}
-
-impl ImgStatus {
-    fn hash(&mut self, status: &RunningStatus, settings: HashSettings) {
-        let result = if let ImgStatus::Unhashed(path) = *self {
-        
-        }
-    }
-}
-
-struct HashQueue {
-    vec: Vec<ImgStatus>,
-    curr: AtomicUsize,
-}
-
-impl HashQueue {
-    fn from_vec(vec: Vec<PathBuf>) -> ParQueue {
-        ParQueue {
-            vec: vec.into_iter().map(|path| ImgStatus::Unhashed(path)).collect(),
-            curr: AtomicUsize::new(0),
-        }
-    }
-
-    fn next(&self) -> Option<&mut ImgStatus> {
-        let idx = self.curr.fetch_add(1, Relaxed);
-        self.vec.get(idx).map(|img| unsafe { &mut *(img as *const T as *mut T) })
-    }
-}
-
-pub struct ImgResults {
-    pub uniques: Vec<UniqueImage>,
-    pub errors: Vec<ImgDupError>,
-}
-
-#[derive(Copy)]
-struct HashSettings {
-    hash_size: u32,
-    hash_type: HashType,
-    threshold: f32,
-}
-
-
-
-pub type ImgDupResult<T> = Result<T, ImgDupError>;
-
-pub enum ImgDupError {
-    LoadingErr(PathBuf, ImageError),
-    LoadingPanic(PathBuf, String),
-    HashingPanic(PathBuf, String),
-}
-
-fn load_and_hash_image(settings: HashSettings, path: &Path) -> ImgDupResult<Image> {
-    let (image, load_time) = try!(try_load_image(path));
-
-    let (hash, hash_time) = match try_hash_image(&image, settings) {
-        Ok(ok) => ok,
-        Err(cause) => return Err(ImgDupError::HashingPanic(path.to_path_buf(), cause)),
-    };
-
-    Ok(
-        Image {
-            path: path.to_path_buf(),
-            hash: hash,
-            dimensions: image.dimensions(),
-            load_time: load_time,
-            hash_time: hash_time,
-        }
-    )
-}
-
-fn duration_with_val<T, F: FnOnce() -> T>(f: F) -> (T, Duration) {
-    let mut opt_val: Option<T> = None;
-    let duration = Duration::span(|| opt_val = Some(f()));
-    (opt_val.unwrap(), duration)
-}
-
-fn image_open(path: &Path) -> image::ImageResult<DynamicImage> {
-    let ref path = ::std::old_path::Path::new(path.to_str().unwrap());
-    image::open(path)
-}
-
+pub fn find_uniques(images: Vec<Image>, threshold: u32) -> Vec<UniqueImage> {
+	let mut mgr = ImageManager::new(threshold);
+	mgr.add_all(images);
+	mgr.into_vec()
 }

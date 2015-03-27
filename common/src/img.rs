@@ -1,8 +1,7 @@
-use img_hash::ImageHash;
+use image::{self, DynamicImage, GenericImage, ImageError};
+use img_hash::{ImageHash, HashType};
 
-use std::cmp::Ordering;
-use std::mem;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 #[derive(Eq, PartialEq, Clone)]
@@ -14,100 +13,106 @@ pub struct Image {
     pub hash_time: Duration,
 }
 
-pub struct UniqueImage {
-    pub img: Image,
-    pub similars: Vec<SimilarImage>,
+impl Image {
+	fn load_and_hash(path: &Path, settings: HashSettings) 
+	-> Result<Image, ImageError> {
+		let (image, load_time) = duration_with_val(|| image::open(path));
+		let image: DynamicImage = try!(image);
+
+		let (hash, hash_time) = duration_with_val(|| ImageHash::hash(&image,settings.hash_size, settings.hash_type));
+
+		Ok(Image {
+			path: path.to_path_buf(),
+			hash: hash,
+			dimensions: image.dimensions(),
+			load_time: load_time,
+			hash_time: hash_time,
+		})
+	}
 }
 
-impl UniqueImage {
-    pub fn from_image(img: Image) -> UniqueImage {
-        UniqueImage {
-           img: img,
-           similars: Vec::new(),
-        }
-    }
-    
-    pub fn is_similar(&self, img: &Image, thresh: usize) -> bool {
-        self.img.hash.dist(&img.hash) < thresh
-    }
- 
-    pub fn add_similar(&mut self, img: Image) {
-        let dist = self.img.hash.dist(&img.hash);
-
-        self.similars.push(SimilarImage::from_image(img, dist));
-        self.similars.sort()
-    }
-
-    pub fn promote(&mut self, idx: usize) {
-        mem::swap(&mut self.similars[idx].img, &mut self.img);
-        for similar in self.similars.iter_mut() {
-            let dist = self.img.hash.dist(&similar.img.hash);
-            similar.dist = dist;
-        }
-        
-        self.similars.sort()
-    } 
+#[derive(Copy)]
+pub struct HashSettings {
+    pub hash_size: u32,
+    pub hash_type: HashType,
 }
 
-#[derive(PartialEq, Eq, Clone)]
-pub struct SimilarImage {
-   pub img: Image, 
-   // Distance from the containing UniqueImage
-   pub dist: usize,
+fn duration_with_val<T, F: FnOnce() -> T>(f: F) -> (T, Duration) {
+    let mut opt_val: Option<T> = None;
+    let duration = Duration::span(|| opt_val = Some(f()));
+    (opt_val.unwrap(), duration)
 }
 
-impl SimilarImage {
+pub type ImgDupResult = Result<Image, ImgDupError>;
 
-    fn from_image(img: Image, dist: usize) -> SimilarImage {
-        SimilarImage {
-            img: img,
-            dist: dist,
-        }
-    } 
+pub enum ImgDupError {
+	Loading(ImageError),
+	Panicked,	
 }
 
-impl Ord for SimilarImage {
-    fn cmp(&self, other: &SimilarImage) -> Ordering {
-        self.dist.cmp(other.dist)   
-    }
+pub enum ImgStatus {
+    Unhashed(PathBuf),
+    Hashed(Image),
+    Error(PathBuf, ImageError),
 }
 
-impl PartialOrd for SimilarImage {
-    fn partial_cmp(&self, other: &SimilarImage) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }    
-}
+impl ImgStatus {
+    pub fn hash(&mut self, settings: HashSettings) -> &ImgStatus {
+        let result = if let ImgStatus::Unhashed(ref path) = *self {
+			Image::load_and_hash(path, settings)	
+        } else { return self; };
 
-impl Eq for SimilarImage {}
+		match result {
+			Ok(img) => *self = ImgStatus::Hashed(img),
+			Err(img_err) => self.unhashed_to_error(img_err),
+		}
 
-pub struct ImageManager {
-    images: Vec<UniqueImage>,
-    threshold: usize,
-}
-
-impl ImageManager {
-    pub fn new(threshold: usize) -> Self {
-        ImageManager {
-            images: Vec::new(),
-            threshold: threshold,
-        }
+		self
     }
 
-    pub fn add_image(&mut self, image: Image) {
-        let threshold = self.threshold;
+	fn unhashed_to_error(&mut self, err: ImageError) {
+		let new_self = match *self {
+			ImgStatus::Unhashed(ref path) => ImgStatus::Error(path.clone(), err),
+			_ => unimplemented!(),
+		};
 
-        match self.images.iter_mut().find(|parent| parent.is_similar(&image, threshold)) {
-            Some(parent) => {                
-                parent.add_similar(image);
-                None
-            },
-            None => Some(image),
-        }
-        .map(|image| self.images.push(UniqueImage::from_image(image)));
-    }
+		*self = new_self;
+	}
 
-    pub fn into_vec(self) -> Vec<UniqueImage> {
-        self.images
-    }
+	pub fn is_err(&self) -> bool {
+		match *self {
+			ImgStatus::Error(_, _) => true,
+			_ => false,
+		}
+	}
 }
 
+pub struct ImgResults {
+    pub uniques: Vec<Image>,
+    pub errors: Vec<(PathBuf, ImgDupError)>,
+}
+
+impl ImgResults {
+	pub fn from_statuses(statuses: Vec<ImgStatus>) -> ImgResults {
+		let mut errors = Vec::new();
+		let uniques = statuses.into_iter()
+			.filter_map(|status| 
+				match status {
+					ImgStatus::Hashed(img) => Some(img),
+					ImgStatus::Unhashed(path) => {
+						errors.push((path, ImgDupError::Panicked));
+						None
+					},
+					ImgStatus::Error(path, err) => {
+						errors.push((path, ImgDupError::Loading(err)));
+						None
+					},
+			})
+			.collect();
+
+		ImgResults {
+			uniques: uniques,
+			errors: errors,
+		}
+	}
+}
