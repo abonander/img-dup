@@ -41,7 +41,7 @@ impl UniqueImage {
 #[derive(PartialEq, Eq, Clone)]
 pub struct SimilarImage {
    pub img: Image, 
-   // Distance from the containing UniqueImage
+   /// Distance, in bits, from the containing UniqueImage
    pub dist: u32,
 }
 

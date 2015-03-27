@@ -4,13 +4,14 @@
 //!
 #![feature(collections, convert, fs_walk, std_misc)]
 
-extern crate rustc_serialize as serialize;
+extern crate rustc_serialize;
 extern crate img_hash;
 extern crate image;
 extern crate num_cpus;
 
 mod compare;
 mod img;
+mod serialize;
 mod threaded;
 
 use compare::ImageManager;
