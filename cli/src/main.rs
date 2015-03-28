@@ -1,5 +1,8 @@
+extern crate common;
+
 use std::borrow::ToOwned;
 use std::env;
+use std::io;
 use std::str::FromStr;
 
 mod dedup;
@@ -28,8 +31,9 @@ impl FromStr for Action {
 
 	fn from_str(action: &str) -> Result<Self, String> {
 		let action = match action.trim() {
-			"scan" => Actions::Scan,
-			"dedup" => Actions::Dedup,
+			"scan" => Action::Scan,
+			"dedup" => Action::Dedup,
+			"load" => Action::Load,
 			unk => return Err(format!("Unknown action: {:?}", unk))
 		};
 
@@ -52,4 +56,4 @@ fn main() {
 		Err(msg) => io::println(msg),
 	}	
 }
-	  
+ 
