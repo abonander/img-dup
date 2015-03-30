@@ -9,7 +9,7 @@ getopts = "*"
 log = "*"
 rustc-serialize = "*"
 
-[dependencies.common]
+[dependencies.img_dup_common]
 path = "../common"
 
 [dependencies.image]
