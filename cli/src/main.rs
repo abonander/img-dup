@@ -6,14 +6,12 @@ use std::io;
 use std::str::FromStr;
 
 mod dedup;
-mod load;
 mod scan;
 
 #[derive(Copy)]
 enum Action {
 	Scan,
 	Dedup,
-	Load,
 }
 
 impl Action {
@@ -21,7 +19,6 @@ impl Action {
 		match self {
 			Scan => scan::execute(args),
 			Dedup => dedup::execute(args),
-			Load => load::execute(args),
 		}
 	}
 }
@@ -33,7 +30,6 @@ impl FromStr for Action {
 		let action = match action.trim() {
 			"scan" => Action::Scan,
 			"dedup" => Action::Dedup,
-			"load" => Action::Load,
 			unk => return Err(format!("Unknown action: {:?}", unk))
 		};
 
