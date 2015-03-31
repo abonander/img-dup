@@ -1,8 +1,9 @@
-#![feature(convert)]
+#![feature(convert, path_relative_from)]
 
 extern crate img_dup_common as common;
 extern crate getopts;
 
+use std::convert::From;
 use std::env;
 use std::str::FromStr;
 
@@ -97,4 +98,49 @@ fn print_usage<I: Iterator<Item=String>>(mut args: I) {
         }
     }    
 }
- 
+
+pub enum GetOptResult<T> {
+    Some(T),
+    None,
+    Err(String),
+}
+
+impl<T> GetOptResult<T> {
+    fn map<U, F>(self, f: F) -> GetOptResult<U> where F: FnOnce(T) -> U {
+        use GetOptResult::*;
+
+        match self {
+            Some(val) => Some(f(val)),
+            None => None,
+            Err(msg) => Err(msg),
+        }
+    }
+
+    fn and_then<U, F>(self, f: F) -> GetOptResult<U> where F: FnOnce(T) -> GetOptResult<U> {
+        use GetOptResult::*;
+
+        match self {
+            Some(val) => f(val),
+            None => None,
+            Err(msg) => Err(msg),
+        }
+    }
+}
+
+impl<T> From<Option<T>> for GetOptResult<T> {
+    fn from(opt: Option<T>) -> Self {
+        match opt {
+            Some(val) => GetOptResult::Some(val),
+            None => GetOptResult::None,
+        }
+    }
+}
+
+impl<T> Into<Option<T>> for GetOptResult<T> {
+    fn into(self) -> Option<T> {
+        match self {
+            GetOptResult::Some(val) => Some(val),
+            _ => None,
+        }
+    }
+}

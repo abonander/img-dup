@@ -1,7 +1,7 @@
-use img::HashSettings;
+use img::{ImgResults, HashSettings};
 
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::thread;
@@ -20,20 +20,24 @@ impl ThreadedSession {
 	) -> ThreadedSession {
 		let threads = threads.unwrap_or_else(::num_cpus::get);
 		assert!(threads > 0, "`threads` parameter must be nonzero if provided!");
-		
+
 		let queue = Arc::new(HashQueue::from_vec(images, settings));
 		let move_queue = queue.clone();
 
 		RestartableJob::spawn(threads, move || move_queue.hash_all());
 
 		ThreadedSession {
-			queue: queue
+			queue: queue,
 		}
 	}
 	
 	pub fn status(&self) -> &RunningStatus {
 		&self.queue.status	
-	}	
+    }
+
+    pub fn wait(self) -> ImgResults {
+        ImgResults::from_statuses(self.queue.wait())
+    }
 }
 
 struct HashQueue {
@@ -45,10 +49,13 @@ struct HashQueue {
 
 impl HashQueue {
     pub fn from_vec(vec: Vec<PathBuf>, settings: HashSettings) -> HashQueue {
+        let vec: Vec<_> = vec.into_iter().map(|path| ImgStatus::Unhashed(path)).collect();
+        let end = vec.len();
+
         HashQueue {
-            vec: vec.into_iter().map(|path| ImgStatus::Unhashed(path)).collect(),
+            vec: vec,
             curr: AtomicUsize::new(0),
-			status: RunningStatus::new(),
+			status: RunningStatus::new(end),
 			settings: settings,
         }
     }
@@ -60,17 +67,37 @@ impl HashQueue {
 		)
     }
 
-	pub fn hash_all(&self) {
+	fn hash_all(&self) {
+        let mut guard = PanicGuard { status: &self.status, active: true };
+
 		while let Some(status) = self.next() {
 			status.hash(self.settings);
-			
-			if status.is_err() {
-				self.status.add_error();
-			}
-						
-			self.status.add_done();	
+			self.status.add_done(status.is_err());
 		}
+
+        guard.active = false;
 	}
+
+    fn wait(&self) -> Vec<ImgStatus> {
+        while !self.status.is_done() {
+            self.status.wait_for_update();
+        }
+
+        self.vec.clone()
+    }
+}
+
+struct PanicGuard<'a> {
+    status: &'a RunningStatus,
+    active: bool,
+}
+
+impl<'a> Drop for PanicGuard<'a> {
+    fn drop(&mut self) {
+        if self.active {
+            self.status.add_done(true);
+        }
+    }
 }
 
 type JobFn = Box<Fn() + Send + Sync + 'static>;
@@ -109,13 +136,19 @@ impl Drop for RestartableJob {
 pub struct RunningStatus {
     done: AtomicUsize,
     errors: AtomicUsize,
+    end: usize,
+    mutex: Mutex<()>,
+    cvar: Condvar,
 }
 
 impl RunningStatus {
-    fn new() -> Self {
+    fn new(end: usize) -> Self {
         RunningStatus {
             done: AtomicUsize::new(0),
             errors: AtomicUsize::new(0),
+            end: end,
+            mutex: Mutex::new(()),
+            cvar: Condvar::new(),
         }
     }
 
@@ -127,15 +160,25 @@ impl RunningStatus {
         self.errors.load(Relaxed)
     }
 
-    pub fn total(&self) -> usize {
-        self.done() + self.errors()
+    pub fn wait_for_update(&self) {
+        use std::time::Duration;
+        let _ = self.cvar.wait_timeout(
+            self.mutex.lock().unwrap(),
+            Duration::seconds(1)
+        );
     }
 
-    fn add_done(&self) {
+    pub fn is_done(&self) -> bool {
+        self.done() == self.end
+    }
+
+    fn add_done(&self, was_error: bool) {
         self.done.fetch_add(1, Relaxed);
-    }
 
-    fn add_error(&self) {
-        self.errors.fetch_add(1, Relaxed);
+        if was_error {
+            self.errors.fetch_add(1, Relaxed);
+        }
+
+        self.cvar.notify_all();
     }
 }

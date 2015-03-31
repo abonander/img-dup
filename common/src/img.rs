@@ -1,6 +1,7 @@
 use image::{self, DynamicImage, GenericImage, ImageError};
 use img_hash::{ImageHash, HashType};
 
+use std::fmt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -50,6 +51,20 @@ pub enum ImgDupError {
 	Panicked,	
 }
 
+impl fmt::Display for ImgDupError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ImgDupError::Loading(ref img_err) => 
+                fmt.write_fmt(format_args!("(loading error) {}", img_err)),
+            ImgDupError::Panicked => fmt.write_str(
+                "An unexpected error occurred while processing this image.
+                Please see the stderr feed for more info."
+            ),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum ImgStatus {
     Unhashed(PathBuf),
     Hashed(Image),
@@ -88,14 +103,14 @@ impl ImgStatus {
 }
 
 pub struct ImgResults {
-    pub uniques: Vec<Image>,
+    pub images: Vec<Image>,
     pub errors: Vec<(PathBuf, ImgDupError)>,
 }
 
 impl ImgResults {
 	pub fn from_statuses(statuses: Vec<ImgStatus>) -> ImgResults {
 		let mut errors = Vec::new();
-		let uniques = statuses.into_iter()
+		let images = statuses.into_iter()
 			.filter_map(|status| 
 				match status {
 					ImgStatus::Hashed(img) => Some(img),
@@ -111,7 +126,7 @@ impl ImgResults {
 			.collect();
 
 		ImgResults {
-			uniques: uniques,
+			images: images,
 			errors: errors,
 		}
 	}

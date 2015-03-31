@@ -13,7 +13,7 @@ use std::time::Duration;
 
 #[derive(RustcEncodable, RustcDecodable)]
 struct SerializeImage {
-	path: PathBuf,
+	path: String,
 	hash: String,
 	dimensions: (u32, u32),
 	load_time: i64,
@@ -23,7 +23,7 @@ struct SerializeImage {
 impl SerializeImage {
 	fn from_img(img: &Image) -> SerializeImage {
 		SerializeImage {
-			path: img.path.clone(),
+			path: img.path.display().to_string(),
 			hash: img.hash.to_base64(),
 			dimensions: img.dimensions,
 			load_time: img.load_time.num_milliseconds(),
@@ -33,7 +33,7 @@ impl SerializeImage {
 
 	fn to_image(&self) -> Image {
 		Image {
-			path: self.path.clone(),
+			path: From::from(&self.path.clone()),
 			hash: ImageHash::from_base64(&self.hash).unwrap(),
 			dimensions: self.dimensions,
 			load_time: Duration::milliseconds(self.load_time),
@@ -91,18 +91,18 @@ impl SerializeSimilar {
 #[derive(RustcEncodable, RustcDecodable)]
 pub struct SerializeSession {
 	pub hash_size: u32,
-	images: Vec<SerializeUnique>,
+	images: Vec<SerializeImage>,
 }
 
 impl SerializeSession {
-	pub fn from_uniques<'a, I>(
+	pub fn from_images<'a, I>(
 		into_iter: I,
 		hash_size: u32
-	) -> SerializeSession where I: IntoIterator<Item=&'a UniqueImage> {
+	) -> SerializeSession where I: IntoIterator<Item=&'a Image> {
 		SerializeSession {
 			hash_size: hash_size,
 			images: into_iter.into_iter()
-				.map(SerializeUnique::from_unique).collect(),
+				.map(SerializeImage::from_img).collect(),
 		}
 	}
 
@@ -128,8 +128,8 @@ impl SerializeSession {
 		<SerializeSession as Decodable>::decode(decoder)
 	}
 
-	pub fn get_uniques(&self) -> Vec<UniqueImage> {
-		self.images.iter().map(|unique| unique.to_unique()).collect()	
+	pub fn get_images(&self) -> Vec<Image> {
+		self.images.iter().map(|img| img.to_image()).collect()	
 	}
 }
 

@@ -1,7 +1,5 @@
 //! As a library crate, `img_dup` provides tools for searching for images, hashing them in
 //! parallel, and collating their hashes to find near or complete duplicates.
-//!
-//!
 #![feature(collections, convert, fs_walk, std_misc)]
 
 extern crate rustc_serialize;
@@ -11,7 +9,7 @@ extern crate num_cpus;
 
 mod compare;
 mod img;
-mod serialize;
+pub mod serialize;
 mod threaded;
 
 use compare::ImageManager;
@@ -19,16 +17,18 @@ use compare::ImageManager;
 pub use compare::UniqueImage;
 
 use img::{
-	ImgResults,
 	ImgStatus,
 	HashSettings,
 };
 
-pub use img::Image;
+pub use img::{Image, ImgResults};
 
-use threaded::ThreadedSession;
+pub use threaded::{
+    RunningStatus,
+    ThreadedSession,
+};
 
-use img_hash::HashType;
+pub use img_hash::HashType;
 
 use std::borrow::ToOwned;
 use std::convert::AsRef;
@@ -109,7 +109,7 @@ impl<'a> ImageSearch<'a> {
     }
 }
 
-pub const DEAFULT_HASH_SIZE: u32 = 16;
+pub const DEFAULT_HASH_SIZE: u32 = 8;
 pub const DEFAULT_HASH_TYPE: HashType = HashType::Gradient;
 pub const DEFAULT_THRESHOLD: u32 = 2;
 
@@ -147,7 +147,7 @@ impl SessionBuilder {
     pub fn from_images(images: Vec<PathBuf>) -> SessionBuilder {
         SessionBuilder {
             images: images,
-            hash_size: DEAFULT_HASH_SIZE,
+            hash_size: DEFAULT_HASH_SIZE,
             hash_type: DEFAULT_HASH_TYPE,
         }
     }
