@@ -1,6 +1,6 @@
 [package]
 
-name = "img_dup"
+name = "img-dup"
 version = "1.0.0"
 authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
@@ -9,7 +9,7 @@ getopts = "*"
 log = "*"
 rustc-serialize = "*"
 
-[dependencies.img_dup_common]
+[dependencies.img-dup-common]
 path = "../common"
 
 [dependencies.image]

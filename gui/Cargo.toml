@@ -1,6 +1,6 @@
 [package]
 
-name = "img_dup_ui"
+name = "img-dup"
 version = "0.0.1"
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 

@@ -1,6 +1,6 @@
 [package]
 
-name = "img_dup_common"
+name = "img-dup-common"
 version = "1.0.0"
 authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
