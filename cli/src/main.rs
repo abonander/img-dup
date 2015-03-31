@@ -1,8 +1,9 @@
-extern crate common;
+#![feature(convert)]
 
-use std::borrow::ToOwned;
+extern crate img_dup_common as common;
+extern crate getopts;
+
 use std::env;
-use std::io;
 use std::str::FromStr;
 
 mod dedup;
@@ -12,16 +13,35 @@ mod scan;
 enum Action {
 	Scan,
 	Dedup,
+    List,
+    Help,
 }
 
 impl Action {
 	fn execute<I: Iterator<Item=String>>(self, args: I) {
 		match self {
-			Scan => scan::execute(args),
-			Dedup => dedup::execute(args),
+			Action::Scan => scan::execute(args),
+			Action::Dedup => dedup::execute(args),
+            Action::Help => print_usage(args),
+            Action::List => Action::list(),
 		}
 	}
+
+    fn print_usage(self) {
+        match self {
+            Action::Scan => scan::print_usage(),
+            Action::Dedup => dedup::print_help(),
+            Action::Help => println!("{}", "Get help for an action."),
+            Action::List => println!("{}", "List available actions."),
+        }
+    }
+
+    fn list() {
+        println!("{}", "Supported actions: scan dedup");
+    }
 }
+
+static CALLING_FORMAT: &'static str = "Expected: `img_dup {action} [options]`";
 
 impl FromStr for Action {
 	type Err = String;
@@ -30,10 +50,12 @@ impl FromStr for Action {
 		let action = match action.trim() {
 			"scan" => Action::Scan,
 			"dedup" => Action::Dedup,
-			unk => return Err(format!("Unknown action: {:?}", unk))
+            "help" => Action::Help,
+            "list" => Action::List,
+			unk => return Err(format!("unknown action: {:?}", unk))
 		};
 
-		Some(action)
+		Ok(action)
 	}
 }
 
@@ -41,15 +63,38 @@ fn main() {
 	// The first argument is the executable name
 	let mut args = env::args().skip(1);
 	
-	let action = args.next()
-		.map_or_else(
-			|arg| arg.parse::<Action>(),
-			|| Err("Please enter an action!".to_owned())
-		);
+	let action = match args.next() {
+        Some(action) => action.parse::<Action>(),
+        None => {
+            println!("{}", CALLING_FORMAT);
+            return;
+        },
+	};
 	
 	match action {
 		Ok(action) => action.execute(args),
-		Err(msg) => io::println(msg),
+		Err(msg) => {
+            println!("Error: {}", msg);
+            Action::list();
+        }
 	}	
+}
+
+fn print_usage<I: Iterator<Item=String>>(mut args: I) {
+    let action = match args.next() {
+        Some(action) => action.parse::<Action>(),
+        None => {
+            println!("{}", "Expected: `img_dup help {action}`");
+            return;
+        }
+    };
+
+    match action {
+        Ok(action) => action.print_usage(),
+        Err(msg) => {
+            println!("{}", msg);
+            return;
+        }
+    }    
 }
  
