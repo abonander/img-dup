@@ -11,6 +11,7 @@ num_cpus = "*"
 
 [dependencies.img_hash]
 git = "https://github.com/cybergeek94/img_hash"
+features = ["rust-image"]
 
 [dependencies.image]
 git = "https://github.com/PistonDevelopers/image"

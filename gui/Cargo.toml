@@ -4,14 +4,8 @@ name = "img-dup"
 version = "0.0.1"
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
-[dependencies.img_dup]
-path = "../"
+[dependencies.img_dup_common]
+path = "../common"
 
-[dependencies.file_dialog]
-git = "https://github.com/cybergeek94/file_dialog"
-
-[dependencies.conrod]
-git = "https://github.com/PistonDevelopers/conrod"
-
-[dependencies.pistoncore-sdl2_window]
-git = "https://github.com/PistonDevelopers/sdl2_window"
+[dependencies.rgtk]
+git = "https://github.com/rust-gnome/gtk"
