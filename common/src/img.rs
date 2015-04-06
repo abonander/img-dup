@@ -1,8 +1,12 @@
 use image::{self, DynamicImage, GenericImage, ImageError};
 use img_hash::{ImageHash, HashType};
 
+use std::any::Any;
+use std::borrow::ToOwned;
 use std::fmt;
+use std::mem;
 use std::path::{Path, PathBuf};
+use std::thread;
 use std::time::Duration;
 
 #[derive(Eq, PartialEq, Clone)]
@@ -32,7 +36,7 @@ impl Image {
 	}
 }
 
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 pub struct HashSettings {
     pub hash_size: u32,
     pub hash_type: HashType,
@@ -48,7 +52,25 @@ pub type ImgDupResult = Result<Image, ImgDupError>;
 
 pub enum ImgDupError {
 	Loading(ImageError),
-	Panicked,	
+	Panicked(String),
+}
+
+impl ImgDupError {
+    fn from_box_any(box_any: Box<Any + 'static>) -> ImgDupError {
+        fn get_err_msg(box_any: Box<Any + 'static>) -> String {
+            let box_any = match box_any.downcast::<String>() {
+                Some(panic_msg) => return (*panic_msg).clone(),
+                Err(box_any) => box_any
+            };
+
+            match box_any.downcast::<&'static str>() {
+                Some(panic_msg) => (*panic_msg).to_owned(),
+                Err(box_any) => format!("{:?}", box_any), 
+            }
+        }
+
+        ImgDupError::Panicked(get_err_msg(box_any))
+    }
 }
 
 impl fmt::Display for ImgDupError {
@@ -66,33 +88,26 @@ impl fmt::Display for ImgDupError {
 
 #[derive(Clone)]
 pub enum ImgStatus {
+    Taken,
     Unhashed(PathBuf),
     Hashed(Image),
-    Error(PathBuf, ImageError),
+    Error(PathBuf, ImgDupError),
 }
 
 impl ImgStatus {
     pub fn hash(&mut self, settings: HashSettings) -> &ImgStatus {
-        let result = if let ImgStatus::Unhashed(ref path) = *self {
-			Image::load_and_hash(path, settings)	
-        } else { return self; };
+        if let ImgStatus::Unhashed(path) = mem::replace(self, ImgStatus::Taken) {
+			let result = thread::catch_panic(Image::load_and_hash(&path, settings));
 
-		match result {
-			Ok(img) => *self = ImgStatus::Hashed(img),
-			Err(img_err) => self.unhashed_to_error(img_err),
-		}
+            *self = match result {
+			    Ok(Ok(img)) => ImgStatus::Hashed(img),
+			    Ok(Err(img_err)) => ImgStatus::Error(path, ImgDupError::LoadingError(img_err)), 
+                Err(box_any) => ImgStatus::Error(path, ImgDupError::from_box_any(box_any)),
+		    };
+        }
 
 		self
     }
-
-	fn unhashed_to_error(&mut self, err: ImageError) {
-		let new_self = match *self {
-			ImgStatus::Unhashed(ref path) => ImgStatus::Error(path.clone(), err),
-			_ => unimplemented!(),
-		};
-
-		*self = new_self;
-	}
 
 	pub fn is_err(&self) -> bool {
 		match *self {
@@ -114,14 +129,11 @@ impl ImgResults {
 			.filter_map(|status| 
 				match status {
 					ImgStatus::Hashed(img) => Some(img),
-					ImgStatus::Unhashed(path) => {
-						errors.push((path, ImgDupError::Panicked));
-						None
-					},
 					ImgStatus::Error(path, err) => {
-						errors.push((path, ImgDupError::Loading(err)));
+						errors.push((path, err));
 						None
 					},
+                    _ => None,
 			})
 			.collect();
 

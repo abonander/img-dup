@@ -22,9 +22,12 @@ impl ThreadedSession {
 		assert!(threads > 0, "`threads` parameter must be nonzero if provided!");
 
 		let queue = Arc::new(HashQueue::from_vec(images, settings));
-		let move_queue = queue.clone();
 
-		RestartableJob::spawn(threads, move || move_queue.hash_all());
+        for _ in 0..threads {
+            let loc_queue = queue.clone;
+    
+            thread::spawn(move|| loc_queue.hash_all());
+        }
 
 		ThreadedSession {
 			queue: queue,
@@ -68,15 +71,11 @@ impl HashQueue {
     }
 
 	fn hash_all(&self) {
-        let mut guard = PanicGuard { status: &self.status, active: true };
-
 		while let Some(status) = self.next() {
 			status.hash(self.settings);
 			self.status.add_done(status.is_err());
 		}
-
-        guard.active = false;
-	}
+    }
 
     fn wait(&self) -> Vec<ImgStatus> {
         while !self.status.is_done() {
@@ -87,51 +86,6 @@ impl HashQueue {
     }
 }
 
-struct PanicGuard<'a> {
-    status: &'a RunningStatus,
-    active: bool,
-}
-
-impl<'a> Drop for PanicGuard<'a> {
-    fn drop(&mut self) {
-        if self.active {
-            self.status.add_done(true);
-        }
-    }
-}
-
-type JobFn = Box<Fn() + Send + Sync + 'static>;
-
-#[derive(Clone)]
-struct RestartableJob {
-	job: Arc<JobFn>,
-}
-
-impl RestartableJob {
-	fn spawn<F>(threads: usize, job: F) where F: Fn() + Send + Sync + 'static {
-		let job = RestartableJob {
-			job: Arc::new(Box::new(job)),
-		};
-
-		for _ in 0 .. threads {
-			let move_job = job.clone();
-			thread::spawn(move || move_job.execute());
-		}
-	}
-	
-	fn execute(self) {
-		(self.job)()	
-	} 	
-}
-
-impl Drop for RestartableJob {
-	fn drop(&mut self) {
-		if thread::panicking() {
-			let move_self = self.clone();
-			thread::spawn(move || move_self.execute());
-		}
-	}	
-}
 
 pub struct RunningStatus {
     done: AtomicUsize,
