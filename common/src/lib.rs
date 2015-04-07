@@ -1,6 +1,6 @@
 //! As a library crate, `img_dup` provides tools for searching for images, hashing them in
 //! parallel, and collating their hashes to find near or complete duplicates.
-#![feature(collections, convert, fs_walk, std_misc)]
+#![feature(catch_panic, collections, fs_walk, std_misc)]
 
 extern crate rustc_serialize;
 extern crate img_hash;
@@ -16,10 +16,7 @@ use compare::ImageManager;
 
 pub use compare::UniqueImage;
 
-use img::{
-	ImgStatus,
-	HashSettings,
-};
+use img::HashSettings;
 
 pub use img::{Image, ImgResults};
 
@@ -177,13 +174,13 @@ impl SessionBuilder {
     pub fn process_local(self) -> ImgResults {
         let (settings, images) = self.recombine();
 
-        let mut results: Vec<_> = images.into_iter()
-			.map(|img| ImgStatus::Unhashed(img))
-			.collect();
+        let mut results = ImgResults::empty();
 
-		let _ = results.iter_mut().map(|img| img.hash(settings)).last();
+        for path in images {
+            results.push_result(Image::load_and_hash(path, settings));
+        }
 
-		ImgResults::from_statuses(results)
+        results
     }
 
     fn recombine(self) -> (HashSettings, Vec<PathBuf>) {

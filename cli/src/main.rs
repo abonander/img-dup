@@ -1,4 +1,4 @@
-#![feature(convert, path_relative_from)]
+#![feature(path_relative_from)]
 
 extern crate img_dup_common as common;
 extern crate getopts;
@@ -10,7 +10,7 @@ use std::str::FromStr;
 mod dedup;
 mod scan;
 
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 enum Action {
 	Scan,
 	Dedup,
@@ -136,6 +136,7 @@ impl<T> From<Option<T>> for GetOptResult<T> {
     }
 }
 
+/* Conflicting impl in `core`
 impl<T> Into<Option<T>> for GetOptResult<T> {
     fn into(self) -> Option<T> {
         match self {
@@ -144,3 +145,4 @@ impl<T> Into<Option<T>> for GetOptResult<T> {
         }
     }
 }
+*/

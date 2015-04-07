@@ -8,7 +8,6 @@ use rustc_serialize::json::{self,  Json};
 use std::io;
 use std::io::prelude::*;
 use std::iter::IntoIterator;
-use std::path::PathBuf;
 use std::time::Duration;
 
 #[derive(RustcEncodable, RustcDecodable)]

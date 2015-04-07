@@ -162,20 +162,11 @@ fn execute_with_args(ref args: Matches) {
 fn monitor_session(session: ThreadedSession) -> ImgResults {
     let ref mut stdout = io::stdout();
     
-    loop {
-        write!(
-            stdout, 
-            "\r{} images processed. ({} errors)",
-            session.status().done(),
-            session.status().errors()
-        ).unwrap();
+    while !session.is_done() {
+        let status = session.wait_for_update();
+
+        write!(stdout, "\r{} images processed. ({} errors)", status.done, status.errors).unwrap();
         stdout.flush().unwrap();
-        
-        if !session.status().is_done() {
-            session.status().wait_for_update();
-        } else {
-            break;
-        }
     }
 
     session.wait()
