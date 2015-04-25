@@ -7,11 +7,13 @@ use std::convert::From;
 use std::env;
 use std::str::FromStr;
 
+mod collate;
 mod dedup;
 mod scan;
 
 #[derive(Copy, Clone)]
 enum Action {
+    Collate,
 	Scan,
 	Dedup,
     List,
