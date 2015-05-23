@@ -6,14 +6,11 @@ authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
 [dependencies]
 log = "*"
+image = "*"
 rustc-serialize = "*"
 num_cpus = "*"
 
 [dependencies.img-hash]
 git = "https://github.com/cybergeek94/img-hash"
 features = ["rust-image"]
-
-[dependencies.image]
-git = "https://github.com/PistonDevelopers/image"
-
 

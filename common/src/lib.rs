@@ -1,6 +1,6 @@
 //! As a library crate, `img_dup` provides tools for searching for images, hashing them in
 //! parallel, and collating their hashes to find near or complete duplicates.
-#![feature(catch_panic, collections, fs_walk, std_misc)]
+#![feature(catch_panic, collections, duration, duration_span, fs_walk, std_misc)]
 
 extern crate rustc_serialize;
 extern crate img_hash;

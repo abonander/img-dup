@@ -10,13 +10,20 @@ use std::io::prelude::*;
 use std::iter::IntoIterator;
 use std::time::Duration;
 
+fn duration_millis(duration: Duration) -> u64 { 
+    let ms_secs = duration.secs() * 1000;
+    let ms_nanos = duration.extra_nanos() as u64 / 1_000_000;
+
+    ms_secs + ms_nanos
+}
+
 #[derive(RustcEncodable, RustcDecodable)]
 struct SerializeImage {
 	path: String,
 	hash: String,
 	dimensions: (u32, u32),
-	load_time: i64,
-	hash_time: i64,
+	load_time: u64,
+	hash_time: u64,
 }
 
 impl SerializeImage {
@@ -25,8 +32,8 @@ impl SerializeImage {
 			path: img.path.display().to_string(),
 			hash: img.hash.to_base64(),
 			dimensions: img.dimensions,
-			load_time: img.load_time.num_milliseconds(),
-			hash_time: img.hash_time.num_milliseconds(),
+			load_time: duration_millis(img.load_time),
+			hash_time: duration_millis(img.hash_time),
 		}
 	}
 
@@ -35,8 +42,8 @@ impl SerializeImage {
 			path: From::from(&self.path.clone()),
 			hash: ImageHash::from_base64(&self.hash).unwrap(),
 			dimensions: self.dimensions,
-			load_time: Duration::milliseconds(self.load_time),
-			hash_time: Duration::milliseconds(self.hash_time),
+			load_time: Duration::from_millis(self.load_time),
+			hash_time: Duration::from_millis(self.hash_time),
 		}
 	}
 }
