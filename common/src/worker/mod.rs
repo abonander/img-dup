@@ -36,9 +36,8 @@ impl WorkManager {
         self.imp.send_msg(Message::Load(path));
     }
 
-    pub fn finish(self) {
+    pub fn finish(&self) {
         self.imp.send_msg(Message::Quit);
-
     }
 
     pub fn rx(&self) -> &Receiver<ImageResult<Image>> {

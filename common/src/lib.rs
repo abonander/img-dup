@@ -20,6 +20,7 @@ pub use compare::UniqueImage;
 use img::HashSettings;
 
 pub use img::{Image, ImgResults};
+pub use worker::WorkManager;
 
 pub use img_hash::HashType;
 
@@ -147,9 +148,25 @@ impl SessionBuilder {
 
     setter! { hash_size: u32 }
     setter! { hash_type: HashType }
- 
 
-    fn recombine(self) -> (HashSettings, Vec<PathBuf>) {
+    pub fn hash_images(self, threads: Option<usize>) -> WorkManager {
+
+        let threads = threads.unwrap_or_else(num_cpus::get);
+
+        let (settings, paths) = self.fission();
+        
+        let manager = WorkManager::start_threads(threads, settings);
+
+        for path in paths {
+            manager.enqueue(path);
+        }
+
+        manager.finish();
+
+        manager
+    }
+
+    fn fission(self) -> (HashSettings, Vec<PathBuf>) {
         let hash_settings = HashSettings {
             hash_size: self.hash_size,
             hash_type: self.hash_type,
