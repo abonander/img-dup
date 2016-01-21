@@ -13,36 +13,21 @@ pub struct Image {
     pub path: PathBuf,
     pub hash: ImageHash,
     pub dimensions: (u32, u32),
-    pub load_time: Duration,
-    pub hash_time: Duration,
+    pub size: u64,
 }
 
 impl Image {
-	fn load_and_hash_inner(path: PathBuf, settings: HashSettings) -> Result<Image, ImageError> {
-		let (image, load_time) = duration_with_val(|| image::open(&path));
-		let image: DynamicImage = try!(image);
+	pub fn hash(path: PathBuf, image: DynamicImage, settings: HashSettings, size: u64) -> Image {
 
-		let (hash, hash_time) = duration_with_val(|| ImageHash::hash(&image,settings.hash_size, settings.hash_type));
+		let hash = ImageHash::hash(&image,settings.hash_size, settings.hash_type);
 
-		Ok(Image {
+		Image {
 			path: path,
 			hash: hash,
 			dimensions: image.dimensions(),
-			load_time: load_time,
-			hash_time: hash_time,
-		})
-	}
-
-    pub fn load_and_hash(path: PathBuf, settings: HashSettings) -> ImgDupResult {
-        let move_path = path.clone();
-	    let result = thread::catch_panic(move || Image::load_and_hash_inner(move_path, settings));
-
-        match result {
-            Ok(Ok(img)) => Ok(img),
-            Ok(Err(load_err)) => Err((path, ImgDupError::Loading(load_err))),
-            Err(box_any) => Err((path, ImgDupError::from_box_any(box_any))),
+		    size: size,
         }
-    }
+	}
 }
 
 #[derive(Copy, Clone)]

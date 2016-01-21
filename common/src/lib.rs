@@ -1,6 +1,7 @@
 //! As a library crate, `img_dup` provides tools for searching for images, hashing them in
 //! parallel, and collating their hashes to find near or complete duplicates.
 #![feature(catch_panic, collections, duration, duration_span, fs_walk, std_misc)]
+#![cfg_attr(windows, feature(open_options_ext))]
 
 extern crate rustc_serialize;
 extern crate img_hash;
@@ -9,8 +10,8 @@ extern crate num_cpus;
 
 mod compare;
 mod img;
-pub mod serialize;
-mod threaded;
+mod worker;
+// pub mod serialize;
 
 use compare::ImageManager;
 
@@ -19,11 +20,6 @@ pub use compare::UniqueImage;
 use img::HashSettings;
 
 pub use img::{Image, ImgResults};
-
-pub use threaded::{
-    RunningStatus,
-    ThreadedSession,
-};
 
 pub use img_hash::HashType;
 
@@ -72,7 +68,7 @@ impl<'a> ImageSearch<'a> {
     /// Add all the extensions from `exts` to `self,
     /// returning `self` for method chaining
     pub fn exts(&mut self, exts: &[&'a str]) -> &mut ImageSearch<'a> {
-        self.exts.push_all(exts);
+        self.exts.extend(exts);
         self
     }
 
@@ -151,37 +147,7 @@ impl SessionBuilder {
 
     setter! { hash_size: u32 }
     setter! { hash_type: HashType }
-
-    /// Spawn an `img_dup` session, using `threads` if supplied,
-    /// or the number of CPUs as reported by the OS otherwise (recommended).
-    ///
-    /// ### Note
-    /// Regardless of the `threads` value, an additional thread will be used for result collation.
-    ///
-    /// ### Panics
-    /// If `threads` is `Some(value)` and `value == 0`.
-    ///
-    /// If `threads` is `None` and this method panics, then for some reason `std::os::num_cpus()`
-    /// returned 0, which is probably bad.
-    pub fn process_multithread(self, threads: Option<usize>) -> ThreadedSession {
-        let (settings, images) = self.recombine();
-        ThreadedSession::process_multithread(threads, settings, images)
-    } 
-
-    /// Do all the processing and collation on the current thread and return the result directly.
-    ///
-    /// **Not** recommended unless avoiding extra threads altogether is somehow desirable.
-    pub fn process_local(self) -> ImgResults {
-        let (settings, images) = self.recombine();
-
-        let mut results = ImgResults::empty();
-
-        for path in images {
-            results.push_result(Image::load_and_hash(path, settings));
-        }
-
-        results
-    }
+ 
 
     fn recombine(self) -> (HashSettings, Vec<PathBuf>) {
         let hash_settings = HashSettings {

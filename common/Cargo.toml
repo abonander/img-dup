@@ -10,7 +10,11 @@ image = "*"
 rustc-serialize = "*"
 num_cpus = "*"
 
-[dependencies.img-hash]
-git = "https://github.com/cybergeek94/img-hash"
+[dependencies.img_hash]
+version = "*"
 features = ["rust-image"]
 
+[target.x86_64-pc-windows-msvc.dependencies]
+winapi = "*"
+user32-sys = "*"
+kernel32-sys = "*"
