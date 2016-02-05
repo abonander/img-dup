@@ -1,19 +1,21 @@
-#![feature(macro_rules, globs, unsafe_destructor, phase)]
+#![feature(unsafe_no_drop_flag, libc, heap_api, rustc_private, alloc)]
 
+extern crate alloc;
+extern crate walkdir;
 extern crate getopts;
 extern crate image;
 extern crate img_hash;
 extern crate libc;
-extern crate serialize;
+extern crate rustc_serialize as serialize;
 extern crate time;
 
 use config::{parse_args, ProgramSettings};
 use output::{output_results, test_outfile};
 use processing::process;
 
-use std::io::util::NullWriter;
+use std::io::{self, Write};
 
-use std::os;
+use std::env;
 
 macro_rules! json_insert(
     ($map:expr, $key:expr, $val:expr) => (
@@ -37,22 +39,23 @@ fn main() {
 }
 
 // Exit immediately, don't leave any threads alive
-pub fn exit() {    
-    unsafe { libc::exit(0); }   
+pub fn exit() {
+    unsafe { libc::exit(0); }
 }
 
 #[cfg(feature = "gui")]
-fn show_gui(settings: ProgramSettings) {   
+fn show_gui(settings: ProgramSettings) {
 	ui::show_gui(settings);
 }
 
 #[cfg(not(feature = "gui"))]
 fn show_gui(_: ProgramSettings) {
-    println!("img_dup was not compiled with GUI support!");    
+    println!("img_dup was not compiled with GUI support!");
 }
 
 fn run() {
-    let args = os::args();
+    let args = env::args().collect::<Vec<_>>();
+
 
     let settings = parse_args(args.as_slice());
 
@@ -62,7 +65,7 @@ fn run() {
 	}
 
     // Silence standard messages if we're outputting JSON
-    let mut out = get_output(&settings);    
+    let mut out = get_output(&settings);
 
     match settings.outfile {
         Some(ref outfile) => {
@@ -70,10 +73,10 @@ fn run() {
                 outfile.display())).unwrap();
             test_outfile(outfile).unwrap();
         },
-        None => (),        
+        None => (),
     };
-    
-    out.write_line("Searching for images...").unwrap();
+
+    writeln!(out, "Searching for images..").unwrap();
 
     let mut image_paths = processing::find_images(&settings);
 
@@ -86,21 +89,21 @@ fn run() {
         image_paths.truncate(settings.limit);
     }
 
-    (writeln!(out, "Processing images in {} threads. Please wait...\n", 
+    (writeln!(out, "Processing images in {} threads. Please wait...\n",
              settings.threads)).unwrap();
 
     let results = processing::process(&settings, image_paths);
 
-    out.write_line("").unwrap();
+    writeln!(out, "").unwrap();
 
-    output::output_results(&settings, &results).unwrap()   
+    output::output_results(&settings, &results).unwrap()
 }
 
-fn get_output(settings: &ProgramSettings) -> Box<Writer> {
+fn get_output(settings: &ProgramSettings) -> Box<Write> {
     if settings.silent_stdout() {
-        box NullWriter as Box<Writer> 
+        Box::new(io::sink()) as Box<Write>
     } else {
-        box std::io::stdio::stdout() as Box<Writer>
-    }    
+        Box::new(std::io::stdout()) as Box<Write>
+    }
 }
 

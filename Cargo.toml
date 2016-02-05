@@ -5,25 +5,32 @@ version = "1.0.0"
 authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
 [features]
-
 gui = ["file_dialog", "pistoncore-sdl2_window", "conrod"]
 
-[dependencies.time]
-git = "https://github.com/rust-lang/time"
+[dependencies]
+rustc-serialize = "*"
+walkdir = "*"
+time = "*"
+image = "*"
+img_hash = { version = "*", features = ["rust-image"] }
+conrod = { version = "*", optional = true }
+pistoncore-sdl2_window = { version = "*", optional = true }
 
 [dependencies.file_dialog]
 git = "https://github.com/cybergeek94/file_dialog"
 optional = true
 
-[dependencies.img_hash]
-git = "https://github.com/cybergeek94/img_hash"
 
-[dependencies.conrod]
-git = "https://github.com/PistonDevelopers/conrod"
-optional = true
 
-[dependencies.pistoncore-sdl2_window]
-git = "https://github.com/PistonDevelopers/sdl2_window"
-optional = true
+
+# [dependencies.conrod]
+# # git = "https://github.com/PistonDevelopers/conrod"
+# version = "*"
+# optional = true
+
+# [dependencies.pistoncore-sdl2_window]
+# # git = "https://github.com/PistonDevelopers/sdl2_window"
+# version = "*"
+# optional = true
 
 

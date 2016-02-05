@@ -3,11 +3,12 @@ use ui::dialogs;
 
 use config::ProgramSettings;
 use img::UniqueImage;
-use processing::{mod, TimedImageResult, ProcessingError, Total};
+use processing::{self, TimedImageResult, ProcessingError, Total};
 
 use std::default::Default;
 
 use std::sync::Arc;
+use std::sync::mpsc::Receiver;
 use std::sync::atomic::{AtomicBool, Relaxed};
 
 use std::thread::Thread;
@@ -21,10 +22,10 @@ pub struct Results {
     pub errors: Vec<ProcessingError>,
     pub avg_load: String,
     pub avg_hash: String,
-    pub elapsed: String,    
+    pub elapsed: String,
 }
 
-pub fn start_processing(settings: ProgramSettings) -> Option<Results> {	
+pub fn start_processing(settings: ProgramSettings) -> Option<Results> {
 	let (mut uic, mut gl, mut events) = create_window("img-dup running", [570, 80]);
 
     let paths = processing::find_images(&settings);
@@ -42,7 +43,7 @@ pub fn start_processing(settings: ProgramSettings) -> Option<Results> {
     let search_path = settings.dir.clone();
 
     let status_rx = receive_images(img_rx, settings, stop.clone());
-   		
+
 	for event in events {
         buf.set_elapsed(precise_time_ns() - start);
 
@@ -50,8 +51,8 @@ pub fn start_processing(settings: ProgramSettings) -> Option<Results> {
 
         match status_rx.try_recv() {
             Ok(Message::Update(status)) => buf.status_update(status),
-            Ok(Message::Finished(total, done, errors)) => { 
-                return Some(buf.into_results(total, done, errors, search_path)); 
+            Ok(Message::Finished(total, done, errors)) => {
+                return Some(buf.into_results(total, done, errors, search_path));
             },
             Err(_) => (),
         }
@@ -60,7 +61,7 @@ pub fn start_processing(settings: ProgramSettings) -> Option<Results> {
 		match event {
 			Event::Render(args) => {
 				gl.draw([0, 0, args.width as i32, args.height as i32], |_, gl| {
-					draw_running_dialog(gl, &mut uic, &mut buf);				
+					draw_running_dialog(gl, &mut uic, &mut buf);
 				});
 			}
 			_ => (),
@@ -70,7 +71,7 @@ pub fn start_processing(settings: ProgramSettings) -> Option<Results> {
     None
 }
 
-#[deriving(Default)]
+#[derive(Default)]
 struct Buffers {
     percent: String,
     avg_load: String,
@@ -79,8 +80,8 @@ struct Buffers {
     count: String,
     elapsed: String,
     elapsed_ns: u64,
-    done: uint, 
-    total: uint,
+    done: usize,
+    total: usize,
     stop: bool,
     slider_cur: f64,
     slider_max: f64,
@@ -95,8 +96,8 @@ impl Buffers {
 
         self.done = status.count + status.errors;
 
-        write_str!(self.count, 
-            "Current (Errors) / Total: {} ({}) / {}", 
+        write_str!(self.count,
+            "Current (Errors) / Total: {} ({}) / {}",
             status.count, status.errors, self.total
         );
 
@@ -124,11 +125,11 @@ impl Buffers {
 
         if elapsed_secs == ns_to_secs(self.elapsed_ns) {
             // Not even a second has passed, don't update
-            return; 
+            return;
         }
 
         self.elapsed_ns = elapsed_ns;
-        
+
         let (hr, min, sec) = secs_to_hr_min_sec(elapsed_secs);
 
         self.elapsed.clear();
@@ -140,17 +141,17 @@ impl Buffers {
     fn clear_buffers(&mut self) {
         self.avg_load.clear();
         self.avg_hash.clear();
-        self.count.clear();    
+        self.count.clear();
         self.percent.clear();
     }
 
     fn into_results(
-        self, 
-        total: Total, 
-        done: Vec<UniqueImage>, 
-        errors: Vec<ProcessingError>, 
+        self,
+        total: Total,
+        done: Vec<UniqueImage>,
+        errors: Vec<ProcessingError>,
         search_path: Path
-    ) -> Results { 
+    ) -> Results {
         Results {
             search_path: search_path,
             total: total,
@@ -159,7 +160,7 @@ impl Buffers {
             avg_hash: self.avg_hash,
             avg_load: self.avg_load,
             elapsed: self.elapsed,
-        } 
+        }
     }
 }
 
@@ -183,12 +184,12 @@ fn secs_to_hr_min_sec(total_secs: u64) -> (u64, u8, u8) {
     (hrs, min, secs)
 }
 
-#[deriving(Copy)]
+#[derive(Copy)]
 struct Status {
     avg_load: u64,
     avg_hash: u64,
-    count: uint,
-    errors: uint,
+    count: usize,
+    errors: usize,
 }
 
 
@@ -212,7 +213,7 @@ fn draw_running_dialog(gl: &mut Gl, uic: &mut UiContext, buf: &mut Buffers) {
         .draw(gl);
 
     uic.label(&*buf.count)
-        .position(5.0, 35.0) 
+        .position(5.0, 35.0)
         .size(18)
         .draw(gl);
 
@@ -220,7 +221,7 @@ fn draw_running_dialog(gl: &mut Gl, uic: &mut UiContext, buf: &mut Buffers) {
         .position(330.0, 35.0)
         .size(18)
         .draw(gl);
-         
+
     uic.label(&*buf.avg_load)
         .position(5.0, 55.0)
         .size(18)
@@ -246,11 +247,11 @@ fn draw_running_dialog(gl: &mut Gl, uic: &mut UiContext, buf: &mut Buffers) {
         .draw(gl);
 }
 
-fn receive_images(img_rx: Receiver<TimedImageResult>, settings: ProgramSettings, stop: Arc<AtomicBool>) 
+fn receive_images(img_rx: Receiver<TimedImageResult>, settings: ProgramSettings, stop: Arc<AtomicBool>)
 -> Receiver<Message> {
     let (status_tx, status_rx) = channel();
-    
-    Thread::spawn(move |:| {        
+
+    Thread::spawn(move || {
         let mut unique_images = Vec::new();
         let mut errors = Vec::new();
 
@@ -270,18 +271,18 @@ fn receive_images(img_rx: Receiver<TimedImageResult>, settings: ProgramSettings,
                 },
                 Err(img_err) => errors.push(img_err),
             }
-            
+
             if status_tx.send_opt(Message::Update(Status {
                 avg_load: total_load / count,
                 avg_hash: total_hash / count,
-                count: count as uint,
+                count: count as usize,
                 errors: errors.len(),
             })).is_err() { return; };
         }
-      
-        status_tx.send(Message::Finished(count as uint + errors.len(), unique_images, errors));    
+
+        status_tx.send(Message::Finished(count as usize + errors.len(), unique_images, errors));
     }).detach();
-    
+
     status_rx
 }
 

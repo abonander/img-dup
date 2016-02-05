@@ -32,8 +32,8 @@ pub fn show_gui(mut settings: ProgramSettings) {
 
 	while again {
         again = setup::show_setup_ui(settings.clone())
-            .and_then(|config| { 
-                settings = config.clone(); 
+            .and_then(|config| {
+                settings = config.clone();
                 running::start_processing(config)
             })
             .map(results::show_results)
@@ -41,8 +41,8 @@ pub fn show_gui(mut settings: ProgramSettings) {
     }
 }
 
-fn font() -> Path {
-	Path::new("assets/FreeSerif.otf")
+fn font() -> &'static Path {
+	&Path::new("assets/FreeSerif.otf")
 }
 
 /// Everything that should be needed to create a UI.
@@ -60,7 +60,7 @@ pub mod prelude {
 
     const GL_VER: OpenGL = OpenGL::_3_2;
 
-    pub fn create_window(name: &str, dimen: [u32, ..2]) -> (UiContext, Gl, UiEvents) {
+    pub fn create_window(name: &str, dimen: [u32; ..2]) -> (UiContext, Gl, UiEvents) {
 	    let window = Sdl2Window::new(GL_VER, WindowSettings {
 		    title: name.to_owned(),
 		    size: dimen,
@@ -68,21 +68,21 @@ pub mod prelude {
 		    exit_on_esc: false,
 		    samples: 4,
 	    });
-	
+
 	    let events = Events::new(window).set(Ups(120)).set(MaxFps(60));
 	    let gl = Gl::new(GL_VER);
 
 	    let theme = Theme::default();
 	    let font = GlyphCache::new(&super::font()).unwrap();
-	
+
 	    let uic = UiContext::new(font, theme);
-        
-        (uic, gl, events)    
+
+        (uic, gl, events)
     }
 
     #[inline]
     pub fn background(gl: &mut Gl, uic: &mut UiContext) {
-        uic.background().color(Color([0.9, 0.9, 0.9, 1.0])).draw(gl);    
+        uic.background().color(Color([0.9, 0.9, 0.9, 1.0])).draw(gl);
     }
 }
 
