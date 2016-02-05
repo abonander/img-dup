@@ -29,8 +29,8 @@ pub fn confirm(title: &'static str, message: &'static str) -> bool {
 }
 
 fn draw_confirm_dialog(
-	gl: &mut Gl, 
-	uic: &mut UiContext, 
+	gl: &mut Gl,
+	uic: &mut UiContext,
 	message: &str,
 	answer: &mut ConfirmResponse,
 ) {
@@ -43,7 +43,7 @@ fn draw_confirm_dialog(
 
 	uic.button(1)
 		.label("Yes")
-		.position(155.0, 25.0) 
+		.position(155.0, 25.0)
 		.dimensions(70.0, 30.0)
 		.callback(|| *answer = ConfirmResponse::Yes)
 		.draw(gl);
@@ -56,7 +56,7 @@ fn draw_confirm_dialog(
 		.draw(gl);
 }
 
-#[deriving(Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 enum ConfirmResponse {
 	Waiting,
 	Yes,

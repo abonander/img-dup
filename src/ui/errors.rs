@@ -6,11 +6,11 @@ use std::sync::Arc;
 use std::thread::Thread;
 
 pub fn show_errors_list(errors: Arc<Vec<ErrorBuf>>) {
-    Thread::spawn(move || {  
+    Thread::spawn(move || {
         let (mut uic, mut gl, mut events) = create_window("img-dup errors", [512, 512]);
 
         let mut buf: Buffers = Buffers::new(errors.len());
-        
+
         for event in events {
             if buf.exit { break; }
 
@@ -29,14 +29,14 @@ pub fn show_errors_list(errors: Arc<Vec<ErrorBuf>>) {
 }
 
 struct Buffers {
-    current: uint,
+    current: usize,
     curr_str: String,
-    total: uint,
+    total: usize,
     exit: bool,
 }
 
 impl Buffers {
-    fn new(total: uint) -> Buffers {
+    fn new(total: usize) -> Buffers {
         let mut buf = Buffers {
             current: if total > 0 { 1 } else { 0 },
             curr_str: String::new(),
@@ -65,11 +65,11 @@ impl Buffers {
 
     fn update_curr_str(&mut self) {
         self.curr_str.clear();
-        write_str!(self.curr_str, "{} / {}", self.current, self.total);    
+        write_str!(self.curr_str, "{} / {}", self.current, self.total);
     }
 
     #[inline]
-    fn idx(&self) -> uint {
+    fn idx(&self) -> usize {
         self.current - 1
     }
 }
@@ -123,34 +123,34 @@ fn draw_errors_ui(gl: &mut Gl, uic: &mut UiContext, buf: &mut Buffers, errors: &
 
     const LINE_X: f64 = 10.0;
     const PATH_POS: [f64; 2] = [10.0, 65.0];
- 
+
     let mut line_y: f64 = 115.0;
 
-    if let Some(error) = errors.get(buf.idx()) { 
+    if let Some(error) = errors.get(buf.idx()) {
         uic.label(&*error.path)
             .point(PATH_POS)
             .size(18)
             .draw(gl);
-       
+
         for line in error.message_lines.iter() {
             uic.label(&**line)
                 .position(LINE_X, line_y)
                 .size(18)
                 .draw(gl);
-                
-            line_y += 25.0;              
+
+            line_y += 25.0;
         }
     } else {
         uic.label("N/A")
             .point(PATH_POS)
             .size(18)
             .draw(gl);
-            
+
         uic.label("N/A")
             .position(LINE_X, line_y)
             .size(18)
             .draw(gl);
-    } 
+    }
 }
 
 pub struct ErrorBuf {
@@ -163,28 +163,28 @@ impl ErrorBuf {
         ErrorBuf {
             path: error.relative_path(relative_to).display().to_string(),
             message_lines: lines(&*error.err_msg(), 80),
-        }             
+        }
     }
-    
+
     pub fn arc_vec(errors: Vec<ProcessingError>, relative_to: &Path) -> Arc<Vec<ErrorBuf>> {
-        Arc::new(errors.into_iter().map(|error| ErrorBuf::new(error, relative_to)).collect())    
-    }  
+        Arc::new(errors.into_iter().map(|error| ErrorBuf::new(error, relative_to)).collect())
+    }
 }
 
-fn lines(parent: &str, line_len: uint) -> Vec<String> {
+fn lines(parent: &str, line_len: usize) -> Vec<String> {
     use std::cmp::min;
     use std::borrow::ToOwned;
 
     let mut strs = Vec::new();
-    
-    let mut start = 0u;
+
+    let mut start = 0usize;
     let len = parent.len();
-    
+
     while start < len {
         let end = min(start + line_len, len);
         strs.push(parent.slice(start, end).to_owned());
-        start += end;    
+        start += end;
     }
 
     strs
-} 
+}

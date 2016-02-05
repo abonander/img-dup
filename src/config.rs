@@ -6,25 +6,25 @@ use std::borrow::ToOwned;
 
 use std::collections::BTreeMap;
 
-use std::fmt::{Show, Formatter};
+use std::fmt::{Display, Formatter};
 use std::fmt::Result as FormatResult;
 
-use std::io::fs::PathExtensions;
+use std::path::{Path, PathBuf};
 
-use std::os;
+use std::env;
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct ProgramSettings {
-    pub threads: uint,
-    pub dir: Path,
+    pub threads: usize,
+    pub dir: PathBuf,
     pub recurse: bool,
-    pub exts: Vec<String>,    
+    pub exts: Vec<String>,
     pub hash_size: u32,
     pub threshold: f32,
     pub fast: bool,
-    pub outfile: Option<Path>,
+    pub outfile: Option<PathBuf>,
     pub dup_only: bool,
-    pub limit: uint,
+    pub limit: usize,
     pub json: JsonSettings,
 	pub gui: bool,
 }
@@ -40,7 +40,7 @@ impl ProgramSettings {
                    Defaults to the number of cores reported by the OS.",
                    "[1+]"),
             optopt("d", "dir",
-                   "The directory the program should search in. 
+                   "The directory the program should search in.
                    Default is the current working directory.",
                    "[directory]"),
             optflag("r", "recurse",
@@ -61,7 +61,7 @@ impl ProgramSettings {
             optmulti("e", "ext",
                      "Search for filenames with the given extension.
                      Defaults are jpeg, jpg, png, and gif.",
-                     "[extension]"), 
+                     "[extension]"),
             optopt("o", "outfile",
                    "Output to the given file. If omitted, will print to stdout.
                    If not absolute, it will be relative to the search directory.",
@@ -91,7 +91,7 @@ impl ProgramSettings {
         HashSettings {
             hash_size: self.hash_size,
             fast: self.fast,
-        }          
+        }
     }
 
     pub fn silent_stdout(&self) -> bool {
@@ -99,12 +99,12 @@ impl ProgramSettings {
     }
 }
 
-impl Show for ProgramSettings {
+impl Display for ProgramSettings {
     fn fmt(&self, fmt: &mut Formatter) -> FormatResult {
         try!(writeln!(fmt, "Threads: {}", self.threads));
         try!(writeln!(fmt, "Directory: {}", &self.dir.display()));
         try!(writeln!(fmt, "Recursive: {}", self.recurse));
-        try!(writeln!(fmt, "Extensions: {}", self.exts.as_slice()));
+        try!(writeln!(fmt, "Extensions: {:?}", self.exts));
         try!(writeln!(fmt, "Hash size: {}", self.hash_size));
         try!(writeln!(fmt, "Threshold: {0:.2}%", self.threshold * 100f32));
         writeln!(fmt, "Fast: {}", self.fast)
@@ -128,17 +128,17 @@ impl ToJson for ProgramSettings {
     }
 }
 
-#[deriving(Copy)]
+#[derive(Copy, Clone)]
 pub struct HashSettings {
     pub hash_size: u32,
     pub fast: bool,
 }
 
-#[deriving(PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub enum JsonSettings {
     NoJson,
     CompactJson,
-    PrettyJson(uint),
+    PrettyJson(usize),
 }
 
 impl JsonSettings {
@@ -150,56 +150,56 @@ impl JsonSettings {
 
 pub fn parse_args(args: &[String]) -> ProgramSettings {
     let settings_opts = ProgramSettings::opts();
-    
+
     let ref opts = getopts(args, settings_opts.as_slice()).unwrap();
-    
+
     if opts.opt_present("help") {
-        print_help_and_exit(settings_opts.as_slice());    
+        print_help_and_exit(settings_opts.as_slice());
     }
 
     let exts_default = vec!("jpeg", "jpg", "png");
 
-    let dir = dir_arg(opts, "dir", os::getcwd().unwrap());
+    let dir = dir_arg(opts, "dir", env::current_dir().unwrap());
 
     ProgramSettings {
-        threads: uint_arg(opts, "threads", os::num_cpus()),
+        threads: usize_arg(opts, "threads", 4 /*FIXME os::num_cpus()*/),
         dir: dir.clone(),
         recurse: opts.opt_present("recurse"),
-        hash_size: uint_arg(opts, "hash-size", 8) as u32,
+        hash_size: usize_arg(opts, "hash-size", 8) as u32,
         threshold: pos_f32_arg(opts, "threshold", 3f32) / 100f32,
         fast: opts.opt_present("fast"),
         exts: exts_args(opts, "ext", exts_default),
         outfile: outfile_arg(opts, "outfile", &dir),
         dup_only: opts.opt_present("dup-only"),
-        limit: uint_arg(opts, "limit", 0),
+        limit: usize_arg(opts, "limit", 0),
         json: json_arg(opts, "json", JsonSettings::NoJson),
-		gui: opts.opt_present("gui"), 
-    }    
+		gui: opts.opt_present("gui"),
+    }
 }
 
-fn dir_arg(args: &Matches, arg: &str, default: Path) -> Path {
-    let dir = args.opt_str(arg).map_or(default, |path| Path::new(path) );
+fn dir_arg<'a>(args: &'a Matches, arg: &'a str, default: PathBuf) -> PathBuf {
+    let dir = args.opt_str(arg).map_or(default, |path| PathBuf::from(path) );
 
-    assert!(dir.is_dir(), "Value passed to {} is not a directory: {}", 
+    assert!(dir.is_dir(), "Value passed to {} is not a directory: {}",
             arg, dir.display());
 
     dir
 }
 
-fn outfile_arg(args: &Matches, arg: &str, dir: &Path) -> Option<Path> {
+fn outfile_arg(args: &Matches, arg: &str, dir: &Path) -> Option<PathBuf> {
     args.opt_str(arg).map(|path| {
-        let path = Path::new(path);
+        let path = PathBuf::from(path);
         if path.is_relative() {
             dir.join(path)
         } else {
-            path            
+            path
         }
     })
 }
 
-fn uint_arg(args: &Matches, arg: &str, default: uint) -> uint {
-    let val = args.opt_str(arg).map_or(default, |arg_str|   
-                arg_str.parse::<uint>().unwrap()
+fn usize_arg(args: &Matches, arg: &str, default: usize) -> usize {
+    let val = args.opt_str(arg).map_or(default, |arg_str|
+                arg_str.parse::<usize>().unwrap()
         );
 
     val
@@ -210,8 +210,8 @@ fn pos_f32_arg(args: &Matches, arg: &str, default: f32) -> f32 {
         .map_or(default, |arg_str|
                 arg_str.parse::<f32>().unwrap()
         );
-    
-    assert!(val > 0f32 && val < 100f32, 
+
+    assert!(val > 0f32 && val < 100f32,
             "Value of {} must be a decimal between 0 and 100", arg);
 
     val
@@ -228,12 +228,12 @@ fn exts_args<'a>(args: &'a Matches, arg: &'a str, default: Vec<&'static str>) ->
 fn json_arg(args: &Matches, arg: &str, default: JsonSettings) -> JsonSettings {
     if args.opt_present(arg) {
         match args.opt_str(arg) {
-            Some(indent) => JsonSettings::PrettyJson(indent.parse::<uint>().unwrap()),
+            Some(indent) => JsonSettings::PrettyJson(indent.parse::<usize>().unwrap()),
             None => JsonSettings::CompactJson,
         }
     } else {
         default
-    }   
+    }
 }
 
 fn print_help_and_exit(opts: &[OptGroup]) {
