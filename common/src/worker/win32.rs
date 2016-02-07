@@ -4,6 +4,8 @@ extern crate kernel32;
 
 use self::winapi::*;
 
+use image;
+
 use super::{HashResult, HashError};
 
 use img::{Image, HashSettings};
@@ -89,7 +91,7 @@ impl Worker {
         }
     }
 
-    fn load(&self, path: PathBuf) -> HashResult  {
+    fn load(&self, path: PathBuf) -> Result<(), HashError>  {
         let meta = try_with_path!(path; fs::metadata(&path));
 
         let len = meta.len();
