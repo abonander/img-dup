@@ -4,11 +4,9 @@ extern crate kernel32;
 
 use self::winapi::*;
 
-use image::{self, ImageResult};
+use super::{HashResult, HashError};
 
 use img::{Image, HashSettings};
-
-use super::Message;
 
 use std::fs::{self, OpenOptions};
 use std::io::prelude::*;
@@ -17,6 +15,12 @@ use std::os::windows::io::IntoRawHandle;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::{io, mem, ptr};
+
+enum Message {
+    Load(PathBuf),
+    Loaded(PathBuf, Vec<u8>),
+    Quit,
+}
 
 pub struct WorkManager {
    iocp: HANDLE,
@@ -35,11 +39,15 @@ impl WorkManager {
         }
     }
 
-    pub fn send_msg(&self, msg: Message) {
-        send_msg(self.iocp, msg); 
+    pub fn enqueue_load(&self, path: PathBuf) {
+        send_msg(self.iocp, Message::Load(path));
     }
 
-    pub fn worker(&self, tx: &Sender<ImageResult<Image>>, hash_cfg: HashSettings) -> Worker {
+    pub fn quit(&self) {
+        send_msg(self.iocp, Message::Quit);
+    }
+
+    pub fn worker(&self, tx: &Sender<HashResult>, hash_cfg: HashSettings) -> Worker {
        Worker {
            iocp: self.iocp,
            tx: tx.clone(),
@@ -57,7 +65,7 @@ fn send_msg(iocp: HANDLE, msg: Message) {
 
 pub struct Worker {
     iocp: HANDLE,
-    tx: Sender<ImageResult<Image>>,
+    tx: Sender<HashResult>,
     hash_cfg: HashSettings,
 }
 
@@ -65,7 +73,7 @@ unsafe impl Send for Worker {}
 
 impl Worker {
     pub fn work(self) {
-        use super::Message::*;
+        use self::Message::*;
 
         loop {
             match self.get_message() {
@@ -81,8 +89,8 @@ impl Worker {
         }
     }
 
-    fn load(&self, path: PathBuf) -> ImageResult<()>  {
-        let meta = try!(fs::metadata(&path));
+    fn load(&self, path: PathBuf) -> HashResult  {
+        let meta = try_with_path!(path; fs::metadata(&path));
 
         let len = meta.len();
 
@@ -91,7 +99,8 @@ impl Worker {
         open_opts.read(true)
             .flags_and_attributes(FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED);
 
-        let file_hnd = try!(open_opts.open(&path)).into_raw_handle();
+        let file_hnd = try_with_path!(path; open_opts.open(&path))
+            .into_raw_handle();
 
         let res = unsafe { 
             kernel32::CreateIoCompletionPort(file_hnd, self.iocp, file_hnd as usize as u64, 0)
@@ -114,7 +123,7 @@ impl Worker {
         Ok(())
     }
 
-    fn loaded(&self, path: PathBuf, mut data: Vec<u8>, read: u64, hnd: HANDLE) -> ImageResult<Image> {
+    fn loaded(&self, path: PathBuf, mut data: Vec<u8>, read: u64, hnd: HANDLE) -> HashResult {
         let res = unsafe { 
             kernel32::CloseHandle(hnd)
         };
@@ -125,8 +134,10 @@ impl Worker {
             data.set_len(read as usize);
         }
 
-        image::load_from_memory(&data)
-            .map(|img| Image::hash(path, img, self.hash_cfg, read))
+        match image::load_from_memory(&data) {
+            Ok(img) => Ok(Image::hash(path, img, self.hash_cfg, read)),
+            Err(err) => Err(HashError::path_and_err(path, err)),
+        }
     }
 
     fn get_message(&self) -> (Message, u64, HANDLE) {

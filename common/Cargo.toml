@@ -1,20 +1,27 @@
 [package]
-
+authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 name = "img-dup-common"
 version = "1.0.0"
-authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]
 
 [dependencies]
-log = "*"
+crossbeam = "0.2.5"
 image = "*"
-rustc-serialize = "*"
+log = "*"
 num_cpus = "*"
+rustc-serialize = "*"
 
 [dependencies.img_hash]
-version = "*"
 features = ["rust-image"]
+version = "*"
+
+[dependencies.libc]
+git = "https://github.com/cybergeek94/libc"
+
+[target]
+
+[target.x86_64-pc-windows-msvc]
 
 [target.x86_64-pc-windows-msvc.dependencies]
-winapi = "*"
-user32-sys = "*"
 kernel32-sys = "*"
+user32-sys = "*"
+winapi = "*"
