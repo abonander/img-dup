@@ -7,15 +7,10 @@ extern crate rustc_serialize;
 extern crate img_hash;
 extern crate image;
 extern crate num_cpus;
+extern crate vec_vp_tree;
 
-mod compare;
 mod img;
-mod worker;
 // pub mod serialize;
-
-use compare::ImageManager;
-
-pub use compare::UniqueImage;
 
 use img::HashSettings;
 
@@ -77,11 +72,9 @@ impl<'a> ImageSearch<'a> {
     /// recursing into subdirectories if `self.recursive` is set to `true`.
     ///
     /// Returns a vector of all found images as paths.
-    ///
-    /// Any I/O errors during searching are safely filtered out.
     pub fn search(self) -> io::Result<Vec<PathBuf>> {
         /// Generic to permit code reuse
-        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>>(iter: I, exts: &[&str]) -> Vec<PathBuf> {
+        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>>(iter: I, exts: &[&str]) -> Result<Vec<PathBuf>> {
                 iter.filter_map(|res| res.ok())
                     .map(|entry| entry.path())
                     .filter(|path|

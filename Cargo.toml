@@ -1,0 +1,19 @@
+[package]
+authors = ["Austin Bonander <austin.bonander@gmail.com>"]
+name = "img-dup"
+version = "1.0.0"
+
+[dependencies]
+image = "*"
+libc = "*"
+log = "*"
+num_cpus = "*"
+rayon = "*"
+rustc-serialize = "*"
+vec-vp-tree = ">=0.1.1, <0.2"
+
+[dependencies.img_hash]
+features = ["rust-image"]
+version = "*"
+
+[workspace]

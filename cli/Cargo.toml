@@ -9,8 +9,8 @@ getopts = "*"
 log = "*"
 rustc-serialize = "*"
 
-[dependencies.img-dup-common]
-path = "../common"
+[dependencies.img-dup]
+path = "../"
 
 [dependencies.image]
 git = "https://github.com/PistonDevelopers/image"

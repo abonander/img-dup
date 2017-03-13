@@ -1,6 +1,6 @@
 #![feature(path_relative_from)]
 
-extern crate img_dup_common as common;
+extern crate img_dup as common;
 extern crate getopts;
 
 use std::convert::From;

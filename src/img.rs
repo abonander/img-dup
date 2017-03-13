@@ -1,6 +1,8 @@
 use image::{self, DynamicImage, GenericImage, ImageError};
 use img_hash::{ImageHash, HashType};
 
+use vec_vp_tree::{DistFn, VpTree};
+
 use std::any::Any;
 use std::borrow::ToOwned;
 use std::fmt;
@@ -99,4 +101,16 @@ impl ImgResults {
     pub fn total(&self) -> usize {
         self.images.len() + self.errors.len()
     }
+}
+
+struct ImageDistFn;
+
+impl DistFn<Image> for ImageDistFn {
+    fn dist(&self, left: &Image, right: &Image) -> u64 {
+        left.hash.distance(&right.hash)
+    }
+}
+
+pub struct ImageManager {
+    tree: VpTree<Image, ImageDistFn>,
 }
