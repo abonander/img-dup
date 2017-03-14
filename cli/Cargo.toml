@@ -1,5 +1,4 @@
 [package]
-
 name = "img-dup"
 version = "1.0.0"
 authors = [ "Austin Bonander <austin.bonander@gmail.com>" ]

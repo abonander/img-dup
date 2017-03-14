@@ -15,5 +15,3 @@ vec-vp-tree = ">=0.1.1, <0.2"
 [dependencies.img_hash]
 features = ["rust-image"]
 version = "*"
-
-[workspace]

@@ -1,0 +1,53 @@
+[root]
+name = "img-dup-gui"
+version = "0.1.0"
+dependencies = [
+ "qml 0.0.9 (git+https://github.com/White-Oak/qml-rust)",
+]
+
+[[package]]
+name = "cmake"
+version = "0.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "gcc 0.3.43 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "gcc"
+version = "0.3.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "lazy_static"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "libc"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "pkg-config"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "qml"
+version = "0.0.9"
+source = "git+https://github.com/White-Oak/qml-rust#3316f54e29331ac951b5cf083179bb71add002e2"
+dependencies = [
+ "cmake 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[metadata]
+"checksum cmake 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)" = "e1acc68a3f714627af38f9f5d09706a28584ba60dfe2cca68f40bf779f941b25"
+"checksum gcc 0.3.43 (registry+https://github.com/rust-lang/crates.io-index)" = "c07c758b972368e703a562686adb39125707cc1ef3399da8c019fc6c2498a75d"
+"checksum lazy_static 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "7291b1dd97d331f752620b02dfdbc231df7fc01bf282a00769e1cdb963c460dc"
+"checksum libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)" = "88ee81885f9f04bff991e306fea7c1c60a5f0f9e409e99f6b40e3311a3363135"
+"checksum pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "3a8b4c6b8165cd1a1cd4b9b120978131389f64bdaf456435caa41e630edba903"
+"checksum qml 0.0.9 (git+https://github.com/White-Oak/qml-rust)" = "<none>"
