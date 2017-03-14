@@ -1,16 +1,17 @@
 [package]
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 name = "img-dup"
-version = "1.0.0"
+version = "0.1.0"
 
 [dependencies]
+clap = "*"
 image = "*"
 libc = "*"
 log = "*"
 num_cpus = "*"
-rayon = "*"
-rustc-serialize = "*"
-vec-vp-tree = ">=0.1.1, <0.2"
+serde = "*"
+serde_derive = "*"
+vec-vp-tree = {version = ">=0.1.1, <0.2", default_features = false }
 
 [dependencies.img_hash]
 features = ["rust-image"]

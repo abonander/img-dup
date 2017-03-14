@@ -1,13 +1,13 @@
 //! As a library crate, `img_dup` provides tools for searching for images, hashing them in
 //! parallel, and collating their hashes to find near or complete duplicates.
-#![feature(catch_panic, collections, duration, duration_span, fs_walk, std_misc)]
-#![cfg_attr(windows, feature(open_options_ext))]
 
-extern crate rustc_serialize;
 extern crate img_hash;
 extern crate image;
 extern crate num_cpus;
-extern crate vec_vp_tree;
+extern crate vec_vp_tree as vp_tree;
+
+#[macro_use]
+extern crate serde_derive;
 
 mod img;
 // pub mod serialize;
@@ -15,7 +15,6 @@ mod img;
 use img::HashSettings;
 
 pub use img::{Image, ImgResults};
-pub use worker::WorkManager;
 
 pub use img_hash::HashType;
 
@@ -25,7 +24,7 @@ use std::fs::{self, DirEntry};
 use std::io;
 use std::path::{Path, PathBuf};
 
-pub static DEFAULT_EXTS: &'static [&'static str] = &["jpg", "png", "gif"];
+pub const DEFAULT_EXTS: &'static [&'static str] = &["jpg", "png", "gif"];
 
 /// A helper struct for searching for image files within a directory.
 pub struct ImageSearch<'a> {
@@ -74,8 +73,8 @@ impl<'a> ImageSearch<'a> {
     /// Returns a vector of all found images as paths.
     pub fn search(self) -> io::Result<Vec<PathBuf>> {
         /// Generic to permit code reuse
-        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>>(iter: I, exts: &[&str]) -> Result<Vec<PathBuf>> {
-                iter.filter_map(|res| res.ok())
+        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>>(iter: I, exts: &[&str]) -> io::Result<Vec<PathBuf>> {
+                /* iter.filter_map(|res| res.ok())
                     .map(|entry| entry.path())
                     .filter(|path|
                         path.extension()
@@ -84,17 +83,20 @@ impl<'a> ImageSearch<'a> {
                             .unwrap_or(false)
                     )
                     .collect()
+                    */
+
+            unimplemented!()
         }
 
         // `match` instead of `if` for clarity
-        let paths = match self.recursive {
+        match self.recursive {
             false => do_filter(try!(fs::read_dir(self.dir)), &self.exts),
-            true => do_filter(try!(fs::walk_dir(self.dir)), &self.exts),
-        };
-
-        Ok(paths)
+            true => unimplemented!(),
+        }
     }
 }
+
+
 
 pub const DEFAULT_HASH_SIZE: u32 = 8;
 pub const DEFAULT_HASH_TYPE: HashType = HashType::Gradient;
@@ -142,22 +144,6 @@ impl SessionBuilder {
     setter! { hash_size: u32 }
     setter! { hash_type: HashType }
 
-    pub fn hash_images(self, threads: Option<usize>) -> WorkManager {
-
-        let threads = threads.unwrap_or_else(num_cpus::get);
-
-        let (settings, paths) = self.fission();
-        
-        let manager = WorkManager::start_threads(threads, settings);
-
-        for path in paths {
-            manager.enqueue(path);
-        }
-
-        manager.finish();
-
-        manager
-    }
 
     fn fission(self) -> (HashSettings, Vec<PathBuf>) {
         let hash_settings = HashSettings {
@@ -167,10 +153,4 @@ impl SessionBuilder {
 
         (hash_settings, self.images)
     }
-}
-
-pub fn find_uniques(images: Vec<Image>, threshold: u32) -> Vec<UniqueImage> {
-	let mut mgr = ImageManager::new(threshold);
-	mgr.add_all(images);
-	mgr.into_vec()
 }

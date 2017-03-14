@@ -1,14 +1,15 @@
 use image::{self, DynamicImage, GenericImage, ImageError};
 use img_hash::{ImageHash, HashType};
 
-use vec_vp_tree::{DistFn, VpTree};
+use vp_tree::VpTree;
+use vp_tree::dist::DistFn;
 
 use std::any::Any;
 use std::borrow::ToOwned;
 use std::fmt;
 use std::path::PathBuf;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Eq, PartialEq, Clone)]
 pub struct Image {
@@ -39,9 +40,9 @@ pub struct HashSettings {
 }
 
 fn duration_with_val<T, F: FnOnce() -> T>(f: F) -> (T, Duration) {
-    let mut opt_val: Option<T> = None;
-    let duration = Duration::span(|| opt_val = Some(f()));
-    (opt_val.unwrap(), duration)
+    let start = Instant::now();
+    let val = f();
+    (val, start.elapsed())
 }
 
 pub enum ImgDupError {
@@ -107,7 +108,7 @@ struct ImageDistFn;
 
 impl DistFn<Image> for ImageDistFn {
     fn dist(&self, left: &Image, right: &Image) -> u64 {
-        left.hash.distance(&right.hash)
+        left.hash.dist(&right.hash) as u64
     }
 }
 

@@ -1,7 +1,0 @@
-[package]
-name = "img-dup-gui"
-version = "0.1.0"
-authors = ["Austin Bonander <austin.bonander@gmail.com>"]
-
-[dependencies]
-qml = { git = "https://github.com/White-Oak/qml-rust" }
