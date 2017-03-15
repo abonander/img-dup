@@ -4,99 +4,25 @@
 extern crate img_hash;
 extern crate image;
 extern crate num_cpus;
+extern crate rayon;
 extern crate vec_vp_tree as vp_tree;
 
+
+extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
 mod img;
 // pub mod serialize;
 
+pub mod hash_type;
+pub mod search;
+
 use img::HashSettings;
 
 pub use img::{Image, ImgResults};
 
 pub use img_hash::HashType;
-
-use std::borrow::ToOwned;
-use std::convert::AsRef;
-use std::fs::{self, DirEntry};
-use std::io;
-use std::path::{Path, PathBuf};
-
-pub const DEFAULT_EXTS: &'static [&'static str] = &["jpg", "png", "gif"];
-
-/// A helper struct for searching for image files within a directory.
-pub struct ImageSearch<'a> {
-    /// The directory to search
-    pub dir: &'a Path,
-    /// If the search should be recursive (visit subdirectories)
-    pub recursive: bool,
-    /// The extensions to match.
-    pub exts: Vec<&'a str>,
-}
-
-impl<'a> ImageSearch<'a> {
-    /// Initiate a search builder with the base search directory.
-    /// Starts with a copy of `DEFAULT_EXTS` for the list of file extensions,
-    /// and `recursive` set to `false`.
-    pub fn with_dir<P: AsRef<Path>>(dir: &'a P) -> ImageSearch<'a> {
-        ImageSearch {
-            dir: dir.as_ref(),
-            recursive: false,
-            exts: DEFAULT_EXTS.to_owned(),
-        }
-    }
-
-    pub fn recursive(&mut self, recursive: bool) -> &mut ImageSearch<'a> {
-        self.recursive = recursive;
-        self
-    }
-
-    /// Add an extension to the list on `self`,
-    /// returning `self` for method chaining
-    pub fn ext(&mut self, ext: &'a str) -> &mut ImageSearch<'a> {
-        self.exts.push(ext);
-        self
-    }
-
-    /// Add all the extensions from `exts` to `self,
-    /// returning `self` for method chaining
-    pub fn exts(&mut self, exts: &[&'a str]) -> &mut ImageSearch<'a> {
-        self.exts.extend(exts);
-        self
-    }
-
-    /// Searche `self.dir` for images with extensions contained in `self.exts`,
-    /// recursing into subdirectories if `self.recursive` is set to `true`.
-    ///
-    /// Returns a vector of all found images as paths.
-    pub fn search(self) -> io::Result<Vec<PathBuf>> {
-        /// Generic to permit code reuse
-        fn do_filter<I: Iterator<Item=io::Result<DirEntry>>>(iter: I, exts: &[&str]) -> io::Result<Vec<PathBuf>> {
-                /* iter.filter_map(|res| res.ok())
-                    .map(|entry| entry.path())
-                    .filter(|path|
-                        path.extension()
-                            .and_then(|s| s.to_str())
-                            .map(|ext| exts.contains(&ext))
-                            .unwrap_or(false)
-                    )
-                    .collect()
-                    */
-
-            unimplemented!()
-        }
-
-        // `match` instead of `if` for clarity
-        match self.recursive {
-            false => do_filter(try!(fs::read_dir(self.dir)), &self.exts),
-            true => unimplemented!(),
-        }
-    }
-}
-
-
 
 pub const DEFAULT_HASH_SIZE: u32 = 8;
 pub const DEFAULT_HASH_TYPE: HashType = HashType::Gradient;

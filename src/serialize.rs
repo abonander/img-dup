@@ -17,9 +17,9 @@ fn duration_millis(duration: Duration) -> u64 {
     ms_secs + ms_nanos
 }
 
-#[derive(RustcEncodable, RustcDecodable)]
+#[derive(Serialize, Deserialize)]
 struct SerializeImage {
-	path: String,
+	path: PathBuf,
 	hash: String,
 	dimensions: (u32, u32),
 	load_time: u64,

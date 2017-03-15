@@ -2,3 +2,4 @@
 
 extern crate img_dup;
 
+fn main() {}
