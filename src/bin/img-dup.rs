@@ -4,6 +4,8 @@ extern crate img_dup as common;
 
 use clap::App;
 
+use common::hash_type::validate_hash_type;
+
 fn is_nonzero(int: String) -> Result<(), String> {
     if int.parse::<u64>().is_err() {
         Err("must be an integer greater than zero.".into())

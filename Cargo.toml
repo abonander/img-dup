@@ -9,6 +9,7 @@ image = "*"
 libc = "*"
 log = "*"
 num_cpus = "*"
+rayon = "*"
 serde = "*"
 serde_derive = "*"
 vec-vp-tree = {version = ">=0.1.1, <0.2", default_features = false }

@@ -4,6 +4,7 @@
 extern crate img_hash;
 extern crate image;
 extern crate num_cpus;
+extern crate rayon;
 extern crate vec_vp_tree as vp_tree;
 
 #[macro_use]
@@ -11,6 +12,8 @@ extern crate serde_derive;
 
 mod img;
 // pub mod serialize;
+
+pub mod hash_type;
 
 use img::HashSettings;
 
