@@ -7,32 +7,27 @@ extern crate num_cpus;
 extern crate rayon;
 extern crate vec_vp_tree as vp_tree;
 
-
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
 mod img;
 // pub mod serialize;
 
-pub mod hash_type;
+pub mod hash_types;
+pub mod model;
 pub mod search;
 
 use img::HashSettings;
 
 pub use img::{Image, ImgResults};
 
-pub use img_hash::HashType;
+use std::path::PathBuf;
 
 pub const DEFAULT_HASH_SIZE: u32 = 8;
-pub const DEFAULT_HASH_TYPE: HashType = HashType::Gradient;
-pub const DEFAULT_THRESHOLD: u32 = 2;
 
 /// A builder struct for bootstrapping an `img_dup` session.
-pub struct SessionBuilder {
-
-    /// The images to hash and compare.
-    pub images: Vec<PathBuf>,
+pub struct Settings {
+    pub dir: PathBuf,
 
     /// The size of the hash to use.
     ///
@@ -42,41 +37,8 @@ pub struct SessionBuilder {
 
     /// The type of the hash to use. See `HashType` for more information.
     pub hash_type: HashType,
+
+    pub threads: u32,
 }
 
-macro_rules! setter {
-    ($field:ident: $field_ty:ty) => (
-        /// Set this field on `self`, returning `self` for method chaining.
-        pub fn $field<'a>(&'a mut self, $field: $field_ty) -> &mut Self {
-            self.$field = $field;
-            self
-        }
-    )
-}
 
-impl SessionBuilder {
-    /// Construct a `SessionBuilder` instance from the vector of paths,
-    /// supplying values from the `DEFAULT_*` constants for the other fields.
-    ///
-    /// To search for images, use the `ImageSearch` struct.
-    pub fn from_images(images: Vec<PathBuf>) -> SessionBuilder {
-        SessionBuilder {
-            images: images,
-            hash_size: DEFAULT_HASH_SIZE,
-            hash_type: DEFAULT_HASH_TYPE,
-        }
-    }
-
-    setter! { hash_size: u32 }
-    setter! { hash_type: HashType }
-
-
-    fn fission(self) -> (HashSettings, Vec<PathBuf>) {
-        let hash_settings = HashSettings {
-            hash_size: self.hash_size,
-            hash_type: self.hash_type,
-        };
-
-        (hash_settings, self.images)
-    }
-}

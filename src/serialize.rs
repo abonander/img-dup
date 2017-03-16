@@ -10,13 +10,6 @@ use std::io::prelude::*;
 use std::iter::IntoIterator;
 use std::time::Duration;
 
-fn duration_millis(duration: Duration) -> u64 { 
-    let ms_secs = duration.secs() * 1000;
-    let ms_nanos = duration.extra_nanos() as u64 / 1_000_000;
-
-    ms_secs + ms_nanos
-}
-
 #[derive(Serialize, Deserialize)]
 struct SerializeImage {
 	path: PathBuf,
