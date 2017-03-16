@@ -52,12 +52,18 @@ macro_rules! hash_types {
 }
 
 hash_types! {
-    Mean, "Mean", "mean", "This algorithm first averages the pixels of the reduced-size and \
+    Mean, "Mean", "mean", "Averages the pixels of the reduced-size and \
                            color image, and then compares each pixel to the average. \n\
                            Fast, but inaccurate. Really only useful for finding duplicates.";
-    Block, "Blockhash.io", "block", "The Blockhash.io (http://blockhash.io) algorithm. \n\n\
+
+    Block, "Blockhash.io", "block", "The Blockhash.io (http://blockhash.io) algorithm. \n\
                             Faster than `Mean` but also prone to more collisions and suitable \
                             only for finding duplicates.";
+
+    Gradient, "Gradient", "grad", "This algorithm compares each pixel in a row to its neighbor \
+                                   and registers changes in gradients (e.g. edges and color \
+                                   boundaries). \n\n\
+                                   More accurate than `Mean` but much faster than `DCT`.";
 }
 
 pub fn print_all() {
