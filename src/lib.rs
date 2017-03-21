@@ -10,24 +10,24 @@ extern crate vec_vp_tree as vp_tree;
 #[macro_use]
 extern crate serde_derive;
 
-mod img;
-// pub mod serialize;
-
-pub mod hash_types;
 pub mod model;
+pub mod hash_type;
 pub mod search;
 
-use img::HashSettings;
+use hash_type::HashType;
+use model::{HashSettings, Image, ImgResults};
 
-pub use img::{Image, ImgResults};
+use image::ImageError;
 
-use std::path::PathBuf;
-
-pub const DEFAULT_HASH_SIZE: u32 = 8;
+use std::path::Path;
 
 /// A builder struct for bootstrapping an `img_dup` session.
-pub struct Settings {
-    pub dir: PathBuf,
+pub struct Settings<'a> {
+    pub dir: &'a Path,
+
+    pub outfile: PathBuf,
+
+    pub recursive: bool,
 
     /// The size of the hash to use.
     ///
@@ -38,7 +38,35 @@ pub struct Settings {
     /// The type of the hash to use. See `HashType` for more information.
     pub hash_type: HashType,
 
-    pub threads: u32,
+    pub threads: usize,
+
+    pub k_nearest: usize,
+
+    pub exts: Vec<&'a str>,
+
+    pub pretty_indent: Option<usize>,
 }
 
+impl Default for Settings<'static> {
+    fn default() -> Self {
+        // Are these really magic values if they're all in one place?
+        Settings {
+            dir: "./".as_ref(),
+            outfile: "img-dup.json".as_ref(),
+            recursive: false,
+            hash_size: 8,
+            hash_type: HashType::Gradient,
+            threads: num_cpus::get(),
+            k_nearest: 5,
+            exts: vec!["jpg", "png", "gif"],
+            pretty_indent: None,
+        }
+    }
+}
 
+pub struct Error {
+    pub path: PathBuf,
+    pub error: ImageError,
+}
+
+pub type Result<T> = ::std::result::Result<T, Error>;

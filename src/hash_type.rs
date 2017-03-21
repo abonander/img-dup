@@ -100,7 +100,7 @@ impl Default for HashType {
 }
 
 impl HashType {
-    pub fn hash_size(&self, hash_size: u32) -> u32 {
+    pub fn true_hash_size(&self, hash_size: u32) -> u32 {
         match *self {
             HashSize::Block => 0,
             HashSize::DoubleGradient => hash_size * 2,
