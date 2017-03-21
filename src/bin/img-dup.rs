@@ -44,7 +44,7 @@ fn app() -> App<'static, 'static> {
               "Add one or more file extensions to the search parameters; 'gif', 'png', and 'jpg' \
                are included by default.")
 
-        (@arg no_default_exts: --("no-default-exts")
+        (@arg no_default_exts: --("no-default-exts") requires[ext]
               "Don't include the default extensions ('gif', 'png', 'jpg').")
 
         (@arg recursive: -r --recursive "If supplied, recursively searches subdirectories.")
@@ -110,11 +110,7 @@ fn args_to_settings(args: ArgMatches) -> Settings {
     if Some(exts) = args.values_of("ext") {
         settings.exts.extend(exts);
 
-        if settings.exts.is_empty() {
-            Error::with_description("`--no-default-exts` was supplied but no extensions \
-                                     were given with `--ext`", ErrorKind::MissingRequiredArgument)
-                .exit();
-        }
+        assert!(!settings.exts.is_empty());
     }
 
     settings

@@ -20,6 +20,16 @@ impl<'a> SearchSettings<'a> {
     }
 }
 
+impl Default for SearchSettings<'static> {
+    fn default() -> Self {
+        SearchSettings {
+            dir: "./".as_ref(),
+            recursive: false,
+            exts: vec!["jpg", "png", "gif"],
+        }
+    }
+}
+
 macro_rules! map_path (
     ($path:expr; $try:expr) => {
         match $try {

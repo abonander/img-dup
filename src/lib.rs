@@ -46,14 +46,11 @@ impl Default for Settings<'static> {
     fn default() -> Self {
         // Are these really magic values if they're all in one place?
         Settings {
-            dir: "./".as_ref(),
             outfile: "img-dup.json".as_ref(),
-            recursive: false,
             hash_size: 8,
             hash_type: HashType::default(),
             threads: num_cpus::get(),
             comp_type: CompareType::KNearest(5),
-            exts: vec!["jpg", "png", "gif"],
             pretty_indent: None,
         }
     }
