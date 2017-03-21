@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use hash_types::HashType;
+use hash::{HashType, HashSettings};
 
 pub struct Images {
     pub images: Vec<HashedImage>,
@@ -45,12 +45,6 @@ pub struct HashedImage {
     pub image: Image,
     pub hash: ImageHash,
     pub hash_time: u64,
-}
-
-#[derive(Copy, Clone)]
-pub struct HashSettings {
-    pub hash_size: u32,
-    pub hash_type: HashType,
 }
 
 fn time_span_ms<T, F: FnOnce() -> T>(f: F) -> (T, u64) {

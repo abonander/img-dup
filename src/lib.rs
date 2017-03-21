@@ -3,7 +3,6 @@
 
 extern crate img_hash;
 extern crate image;
-extern crate num_cpus;
 extern crate rayon;
 extern crate vec_vp_tree as vp_tree;
 
@@ -11,23 +10,21 @@ extern crate vec_vp_tree as vp_tree;
 extern crate serde_derive;
 
 pub mod model;
-pub mod hash_type;
+pub mod hash;
 pub mod search;
 
-use hash_type::HashType;
+use hash::HashType;
 use model::{HashSettings, Image, ImgResults};
 
 use image::ImageError;
+
+use rayon::ThreadPool;
 
 use std::path::Path;
 
 /// A builder struct for bootstrapping an `img_dup` session.
 pub struct Settings<'a> {
-    pub dir: &'a Path,
-
     pub outfile: PathBuf,
-
-    pub recursive: bool,
 
     /// The size of the hash to use.
     ///
@@ -40,9 +37,7 @@ pub struct Settings<'a> {
 
     pub threads: usize,
 
-    pub k_nearest: usize,
-
-    pub exts: Vec<&'a str>,
+    pub comp_type: CompareType,
 
     pub pretty_indent: Option<usize>,
 }
@@ -55,9 +50,9 @@ impl Default for Settings<'static> {
             outfile: "img-dup.json".as_ref(),
             recursive: false,
             hash_size: 8,
-            hash_type: HashType::Gradient,
+            hash_type: HashType::default(),
             threads: num_cpus::get(),
-            k_nearest: 5,
+            comp_type: CompareType::KNearest(5),
             exts: vec!["jpg", "png", "gif"],
             pretty_indent: None,
         }
@@ -70,3 +65,15 @@ pub struct Error {
 }
 
 pub type Result<T> = ::std::result::Result<T, Error>;
+
+pub fn rayon_pool(threads: Option<usize>) -> ThreadPool {
+    use rayon::Configuration;
+
+    let config = if let Some(threads) = threads {
+        Configuration::new().set_num_threads(threads)
+    } else {
+        Configuration::new()
+    };
+
+    ThreadPool::new(config).expect("Error initializing thread pool")
+}

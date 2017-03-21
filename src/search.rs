@@ -5,7 +5,13 @@ use std::fs::{self, DirEntry};
 use std::io;
 use std::path::{Path, PathBuf};
 
-impl<'a> ::Settings<'a> {
+pub struct SearchSettings<'a> {
+    pub dir: &'a Path,
+    pub recursive: bool,
+    pub exts: Vec<&'a str>,
+}
+
+impl<'a> SearchSettings<'a> {
     /// Search `self.dir` for images with extensions contained in `self.exts`,
     /// recursing into subdirectories if `self.recursive` is set to `true`.
     pub fn search<F, Fe>(&self, mut with_path: F, mut with_err: Fe)

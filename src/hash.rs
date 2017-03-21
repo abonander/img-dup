@@ -74,8 +74,7 @@ hash_types! {
     Block, "Blockhash.io", "block",
     "The Blockhash.io (http://blockhash.io) algorithm.\n\
      Faster than `Mean` but also prone to more collisions and suitable only for \
-     finding duplicates. Does not require resizing or filtering the image (reports a hash \
-     size of 0).";
+     finding duplicates. Does not require resizing or filtering the image.";
 
     Gradient, "Gradient", "grad",
     "Compares each pixel in a row to its neighbor and registers changes in gradients (e.g. edges \
@@ -119,4 +118,19 @@ pub fn print_all() {
 
 pub fn validate(hash_type: String) -> Result<(), String> {
     hash_type.parse::<HashType>().and(Ok(()))
+}
+
+#[derive(Copy, Clone)]
+pub struct HashSettings {
+    pub hash_size: u32,
+    pub hash_type: HashType,
+}
+
+impl Default for HashSettings {
+    fn default() -> Self {
+        HashSettings {
+            hash_size: 8,
+            hash_type: HashType::Gradient,
+        }
+    }
 }
