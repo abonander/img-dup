@@ -13,6 +13,7 @@ extern crate serde_derive;
 pub mod model;
 pub mod hash;
 pub mod search;
+pub mod serialize;
 
 mod work;
 

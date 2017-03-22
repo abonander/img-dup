@@ -70,7 +70,6 @@ pub fn load(path: PathBuf) -> Result<LoadedImage, ::Error> {
     }
 }
 
-
 fn loaded_size_dyn(image: &DynamicImage) -> u64 {
     use self::DynamicImage::*;
 

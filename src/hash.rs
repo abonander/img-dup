@@ -100,7 +100,7 @@ impl Default for HashType {
     }
 }
 
-pub fn print_all() {
+pub fn print_types() {
     println!("`img-dup` currently supports the following hash types:");
     for hash_type in HASH_TYPES {
         println!("{} --hash-type={} \n{}\n", hash_type.display_name(),
@@ -108,7 +108,7 @@ pub fn print_all() {
     }
 }
 
-pub fn validate(hash_type: String) -> Result<(), String> {
+pub fn validate_type(hash_type: String) -> Result<(), String> {
     hash_type.parse::<HashType>().and(Ok(()))
 }
 

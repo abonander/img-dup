@@ -4,9 +4,8 @@ extern crate img_dup as common;
 
 use clap::{App, ArgMatches, Error, ErrorKind};
 
-use common::hash;
+use common::hash::{self, HashSettings};
 use common::search::SearchSettings;
-use common::model::HashSettings;
 use common::serialize::SerializeSettings;
 
 fn is_nonzero(int: String) -> Result<(), String> {
@@ -23,17 +22,11 @@ fn is_int(int: String) -> Result<(), String> {
     }
 }
 
-fn is_float(float: String) -> Result<(), String> {
-    match float.parse::<f64>() {
-        Err(_) => Err("must be ")
-    }
-}
-
 fn app() -> App<'static, 'static> {
     clap_app! {
         @app (app_from_crate!())
 
-        (description: "Finds and collates duplicate and similar image files, reporting them in a \
+        (about: "Finds and collates duplicate and similar image files, reporting them in a \
                        JSON file.")
 
         (@arg threads: -t --threads [integer] {is_nonzero}
@@ -57,16 +50,17 @@ fn app() -> App<'static, 'static> {
               "The square of this number will be the number bits to use in the hash; \
                defaults to 8 (64).")
 
-        (@arg hash_type: -h --("hash-type") [string] {hash_types::validate}
+        (@arg hash_type: -h --("hash-type") [string] {hash::validate_type}
               "The hash type to use. Defaults to `grad`. Run `img-dup --list-hash-types` to list \
                all the currently supported hash types.")
 
         (@arg k_nearest: -k [integer] --("k-nearest") {is_int} conflicts_with[distance]
               "Set the number of similar images to collect for each image; defaults to 5, \
-               can be zero.")
+               can be zero. Conflicts with `--distance`")
 
         (@arg distance: -d [integer] --distance {is_int}
-              "Set the maximum number of bits between hashes to consider two images similar.")
+              "Set the maximum number of bits between hashes to consider two images similar; \
+               can be zero (match exact duplicates). Conflicts with `--k-nearest`.")
 
         (@arg list_hash_types: --("list-hash-types")
               "Print all the currently supported hash types and exit.")
@@ -79,10 +73,10 @@ fn app() -> App<'static, 'static> {
     }
 }
 
-fn args_to_settings(args: ArgMatches) -> Settings {
-    use common::CompareType::*;
+fn args_to_settings<'a>(args: &'a ArgMatches) -> AppSettings<'a> {
+    use CompareType::*;
 
-    let mut settings = Settings::default();
+    let mut settings = AppSettings::default();
 
     macro_rules! opt_val {
         ($name:ident => $map:expr) => {
@@ -92,53 +86,57 @@ fn args_to_settings(args: ArgMatches) -> Settings {
         };
     }
 
-    opt_val!(directory => settings.dir = directory.as_ref());
-    opt_val!(outfile => settings.outfile = outfile.as_ref());
-    opt_val!(threads => settings.threads = threads.parse().unwrap());
-    opt_val!(hash_size => settings.hash_size = hash_size);
-    opt_val!(hash_type => settings.hash_type = hash_type.parse().unwrap());
-    opt_val!(k_nearest => settings.comp_type = CompareType(k_nearest.parse().unwrap()));
-    opt_val!(distance => settings.comp_type = CompareType(distance.parse().unwrap()));
-    opt_val!(pretty_ident => settings.pretty_indent = Some(pretty_indent.parse().unwrap()));
+    opt_val!(directory => settings.search.dir = directory.as_ref());
+    opt_val!(outfile => settings.serialize.outfile = outfile.as_ref());
+    opt_val!(threads => settings.threads = Some(threads.parse().unwrap()));
+    opt_val!(hash_size => settings.hash.hash_size = hash_size.parse().unwrap());
+    opt_val!(hash_type => settings.hash.hash_type = hash_type.parse().unwrap());
+    opt_val!(k_nearest => settings.compare_type = KNearest(k_nearest.parse().unwrap()));
+    opt_val!(distance => settings.compare_type = MaxDist(distance.parse().unwrap()));
+    opt_val!(pretty_indent => settings.serialize.pretty_indent = Some(pretty_indent.parse().unwrap()));
 
     if args.is_present("no_default_exts") {
-        settings.exts.clear();
+        settings.search.exts.clear();
     }
 
-    settings.recursive = args.is_present("recursive");
+    settings.search.recursive = args.is_present("recursive");
 
-    if Some(exts) = args.values_of("ext") {
-        settings.exts.extend(exts);
+    if let Some(exts) = args.values_of("ext") {
+        settings.search.exts.extend(exts);
 
-        assert!(!settings.exts.is_empty());
+        assert!(!settings.search.exts.is_empty());
     }
 
     settings
 }
 
+#[derive(Default)]
 struct AppSettings<'a> {
     search: SearchSettings<'a>,
-    hash: HashSettings<'a>,
-
-}
-
-impl Default for AppSettings<'static> {
-    fn default() -> Self {
-    }
+    hash: HashSettings,
+    serialize: SerializeSettings<'a>,
+    threads: Option<usize>,
+    compare_type: CompareType,
 }
 
 enum CompareType {
     KNearest(usize),
-    Dist(u64),
+    MaxDist(u64),
+}
+
+impl Default for CompareType {
+    fn default() -> Self {
+        CompareType::KNearest(5)
+    }
 }
 
 fn main() {
     let args = app().get_matches();
 
     if args.is_present("list_hash_types") {
-        hash::print_all();
+        hash::print_types();
         return;
     }
 
-    let settings = args_to_settings(args);
+    let settings = args_to_settings(&args);
 }
