@@ -1,14 +1,9 @@
-use image::{self, DynamicImage, GenericImage, ImageError};
 use img_hash::ImageHash;
 
 use vp_tree::VpTree;
 use vp_tree::dist::DistFn;
 
-use std::any::Any;
-use std::borrow::ToOwned;
-use std::fmt;
 use std::path::PathBuf;
-use std::thread;
 use std::time::{Duration, Instant};
 
 use hash::{HashType, HashSettings};
@@ -36,7 +31,8 @@ pub struct CollatedImages {
 pub struct Image {
     pub path: PathBuf,
     pub dimensions: (u32, u32),
-    pub size: u64,
+    // The number of bytes in-memory
+    pub loaded_size: u64,
     pub load_time: u64,
 }
 
@@ -47,24 +43,10 @@ pub struct HashedImage {
     pub hash_time: u64,
 }
 
-fn time_span_ms<T, F: FnOnce() -> T>(f: F) -> (T, u64) {
-    let start = Instant::now();
-    let val = f();
-    (val, duration_millis(start.elapsed()))
-}
-
-fn duration_millis(duration: Duration) -> u64 {
-    let ms_secs = duration.secs() * 1000;
-    // 1 ms == 1M ns
-    let ms_nanos = duration.subsec_nanos() as u64 / 1_000_000;
-
-    ms_secs + ms_nanos
-}
-
-struct ImageDistFn;
+pub struct ImageDistFn;
 
 impl DistFn<HashedImage> for ImageDistFn {
-    fn dist(&self, left: &Image, right: &Image) -> u64 {
+    fn dist(&self, left: &HashedImage, right: &HashedImage) -> u64 {
         left.hash.dist(&right.hash) as u64
     }
 }

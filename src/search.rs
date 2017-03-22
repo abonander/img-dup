@@ -15,8 +15,8 @@ impl<'a> SearchSettings<'a> {
     /// Search `self.dir` for images with extensions contained in `self.exts`,
     /// recursing into subdirectories if `self.recursive` is set to `true`.
     pub fn search<F, Fe>(&self, mut with_path: F, mut with_err: Fe)
-    where F: FnMut(PathBuf), Fe: FnMut(WalkDirErr) -> bool {
-        walk_dir(self.dir, self.recursive, self.exts, &mut with_path, &mut with_err)
+    where F: FnMut(PathBuf), Fe: FnMut(::Error) -> bool {
+        walk_dir(self.dir, self.recursive, &self.exts, &mut with_path, &mut with_err)
     }
 }
 
@@ -34,30 +34,37 @@ macro_rules! map_path (
     ($path:expr; $try:expr) => {
         match $try {
             Ok(val) => Ok(val),
-            Err(e) => Err(WalkDirErr {
+            Err(e) => Err(::Error {
                 path: $path.into(),
-                e: e,
-            })
+                error: e.into(),
+            }),
         }
     };
 );
 
 fn walk_dir<F, Fe>(path: &Path, recurse: bool, exts: &[&str], with_path: &mut F, with_err: &mut Fe)
-where F: FnMut(PathBuf), Fe: FnMut(WalkDirErr) -> bool {
+where F: FnMut(PathBuf), Fe: FnMut(::Error) -> bool {
     macro_rules! try_with_path (
         ($path:expr; $res:expr) => (
-            match map_path!($path; $res) {
+            match $res {
                 Ok(val) => val,
-                Err(e) => if with_err(e) {
-                    continue;
-                } else {
+                Err(e) => {
+                    let e = ::Error {
+                        path: $path.into(),
+                        error: e.into(),
+                    };
+
+                    if with_err(e) {
+                        continue;
+                    } else {
                     return;
+                    }
                 }
             }
         )
     );
 
-    let iter = match map_path!(path; fs::read_dir()) {
+    let iter = match map_path!(path; fs::read_dir(&path)) {
         Ok(iter) => iter,
         Err(e) => { with_err(e); return },
     };
@@ -69,7 +76,7 @@ where F: FnMut(PathBuf), Fe: FnMut(WalkDirErr) -> bool {
 
         if ftype.is_dir() {
             if recurse {
-                walk_dir(&entry_path, recurse, exts, with_path, with_err)?;
+                walk_dir(&entry_path, recurse, exts, with_path, with_err);
             }
 
             continue;
@@ -82,9 +89,4 @@ where F: FnMut(PathBuf), Fe: FnMut(WalkDirErr) -> bool {
 
         with_path(entry_path)
     }
-}
-
-pub struct WalkDirErr {
-    path: PathBuf,
-    err: io::Error,
 }

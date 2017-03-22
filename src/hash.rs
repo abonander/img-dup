@@ -1,5 +1,7 @@
 use img_hash::HashType as TrueHashType;
 
+use img_hash::{HashImage, ImageHash};
+
 macro_rules! hash_types {
     ($($name:ident, $dispnm:expr, $serializenm:expr, $desc:expr);+;) => {
         #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,7 +43,7 @@ macro_rules! hash_types {
         }
 
         impl From<TrueHashType> for HashType {
-            fn into(hash_type: TrueHashType) -> HashType {
+            fn from(hash_type: TrueHashType) -> Self {
                 match hash_type {
                     $(TrueHashType::$name => HashType::$name),+,
                     _ => panic!("Unsupported hash type: {:?}", hash_type),
@@ -98,16 +100,6 @@ impl Default for HashType {
     }
 }
 
-impl HashType {
-    pub fn true_hash_size(&self, hash_size: u32) -> u32 {
-        match *self {
-            HashSize::Block => 0,
-            HashSize::DoubleGradient => hash_size * 2,
-            HashSize::DCT => hash_size * 4,
-        }
-    }
-}
-
 pub fn print_all() {
     println!("`img-dup` currently supports the following hash types:");
     for hash_type in HASH_TYPES {
@@ -132,5 +124,17 @@ impl Default for HashSettings {
             hash_size: 8,
             hash_type: HashType::Gradient,
         }
+    }
+}
+
+impl HashSettings {
+    pub fn prepare(&self) {
+        if self.hash_type == HashType::DCT {
+            ::img_hash::precompute_dct_matrix(self.hash_size);
+        }
+    }
+
+    pub fn hash<I>(&self, image: &I) -> ImageHash where I: HashImage {
+        ImageHash::hash(image, self.hash_size, self.hash_type.into())
     }
 }

@@ -66,7 +66,7 @@ fn app() -> App<'static, 'static> {
                can be zero.")
 
         (@arg distance: -d [integer] --distance {is_int}
-              "Set the maximum number of bits in the hash that an image ")
+              "Set the maximum number of bits between hashes to consider two images similar.")
 
         (@arg list_hash_types: --("list-hash-types")
               "Print all the currently supported hash types and exit.")
@@ -120,6 +120,11 @@ struct AppSettings<'a> {
     search: SearchSettings<'a>,
     hash: HashSettings<'a>,
 
+}
+
+impl Default for AppSettings<'static> {
+    fn default() -> Self {
+    }
 }
 
 enum CompareType {
