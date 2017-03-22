@@ -1,30 +1,18 @@
 use img_hash::ImageHash;
 
 use vp_tree::VpTree;
-use vp_tree::dist::DistFn;
+use vp_tree::dist::{DistFn, KnownDist};
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use hash::{HashType, HashSettings};
 
-pub struct Images {
-    pub images: Vec<HashedImage>,
+pub struct CollatedResults {
+    pub tree: ImageTree,
+    pub collate_time: u64,
     pub settings: HashSettings,
-}
-
-impl Images {
-    pub fn collate<F>(self) -> CollatedImages {
-        CollatedImages {
-            tree: VpTree::from_vec_with_dist(self.images, ImageDistFn),
-            settings: self.settings,
-        }
-    }
-}
-
-pub struct CollatedImages {
-    pub tree: VpTree<HashedImage, ImageDistFn>,
-    pub settings: HashSettings,
+    pub errors: Vec<::Error>
 }
 
 #[derive(Eq, PartialEq, Clone)]
@@ -50,3 +38,13 @@ impl DistFn<HashedImage> for ImageDistFn {
         left.hash.dist(&right.hash) as u64
     }
 }
+
+impl KnownDist for HashedImage {
+    type DistFn = ImageDistFn;
+
+    fn dist_fn() -> Self::DistFn {
+        ImageDistFn
+    }
+}
+
+pub type ImageTree = VpTree<HashedImage, ImageDistFn>;
