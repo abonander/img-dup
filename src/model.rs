@@ -4,9 +4,8 @@ use vp_tree::VpTree;
 use vp_tree::dist::{DistFn, KnownDist};
 
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
 
-use hash::{HashType, HashSettings};
+use hash::HashSettings;
 
 pub struct CollatedResults {
     pub tree: ImageTree,

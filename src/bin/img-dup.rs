@@ -2,7 +2,7 @@
 extern crate clap;
 extern crate img_dup as common;
 
-use clap::{App, ArgMatches, Error, ErrorKind};
+use clap::{App, ArgMatches};
 
 use common::hash::{self, HashSettings};
 use common::search::SearchSettings;

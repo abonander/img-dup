@@ -16,22 +16,9 @@ pub mod search;
 pub mod serialize;
 pub mod work;
 
-use futures::IntoFuture;
-use futures::executor;
-
-use hash::HashSettings;
-use model::{Image, HashedImage};
-
-use search::SearchSettings;
-
 use image::ImageError;
 
-use rayon::ThreadPool;
-
-use rayon::par_iter::from_par_iter::FromParallelIterator;
-use rayon::par_iter::{IntoParallelIterator, ParallelIterator};
-
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub struct Error {
     pub path: PathBuf,

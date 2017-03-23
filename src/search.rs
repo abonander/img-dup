@@ -1,8 +1,6 @@
-use std::borrow::ToOwned;
 use std::convert::AsRef;
 use std::ffi::OsStr;
-use std::fs::{self, DirEntry};
-use std::io;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 pub struct SearchSettings<'a> {
