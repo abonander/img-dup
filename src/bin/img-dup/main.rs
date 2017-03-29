@@ -2,6 +2,8 @@
 extern crate clap;
 extern crate img_dup as common;
 
+extern crate callgrind;
+
 use clap::{App, ArgMatches};
 
 use std::fmt::{self, Display, Formatter};
@@ -174,9 +176,13 @@ fn main() {
 
     let start = Instant::now();
 
+    callgrind::start_instrumentation();
+
     let collated = results.collate(Some(Duration::from_secs(1)), ||
         print!("\rCollating Elapsed: {}", Time(start.elapsed()))
     );
+
+    callgrind::stop_instrumentation();
 
     println!("\nCollating Complete. Elapsed: {}", Time(start.elapsed()));
 }
