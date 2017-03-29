@@ -4,7 +4,8 @@ extern crate img_dup as common;
 
 use clap::{App, ArgMatches};
 
-use std::io::{self, Write};
+use std::fmt::{self, Display, Formatter};
+use std::io;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -139,6 +140,15 @@ impl Default for CompareType {
     }
 }
 
+impl Display for CompareType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match *self {
+            CompareType::KNearest(k) => write!(f, "nearest {} images", k),
+            CompareType::MaxDist(dist) => write!(f, "within {} bits", dist),
+        }
+    }
+}
+
 fn main() {
     let args = app().get_matches();
 
@@ -153,14 +163,22 @@ fn main() {
 
     let paths = SearchUi::new().find_images(&settings.search);
 
-    println!("Hashing images...");
+    println!("Hashing images (byte counts are after decompression)...");
 
     let mut hash_ui = HashUi::new();
 
     let results = work::worker(settings.threads, paths)
         .load_and_hash(settings.hash, |status| hash_ui.status_update(status));
 
-    println!();
+    println!("\nHashing complete. Collating ({})...", settings.compare_type);
+
+    let start = Instant::now();
+
+    let collated = results.collate(Some(Duration::from_secs(1)), ||
+        print!("\rCollating Elapsed: {}", Time(start.elapsed()))
+    );
+
+    println!("\nCollating Complete. Elapsed: {}", Time(start.elapsed()));
 }
 
 struct StatusUpdater {
@@ -181,16 +199,19 @@ impl StatusUpdater {
     }
 
     fn update<F: FnOnce()>(&mut self, print: F) {
+        use std::io::Write;
+
         if self.last.elapsed() < self.interval {
             return;
         }
 
         self.last = Instant::now();
 
+        write!(self.stdout, "\r").expect("stdout has been closed");
+
         print();
 
-        write!(self.stdout, "\r").and(self.stdout.flush())
-            .expect("stdout has been closed");
+        self.stdout.flush().expect("stdout has been closed");
     }
 }
 
@@ -227,7 +248,7 @@ impl SearchUi {
         let dirs_visited = Number(self.dirs_visited);
         let img_count = Number(self.paths.len());
 
-        println!("Directories Visited: {} Images Found: {}", dirs_visited, img_count);
+        println!("\rDirectories Visited: {} Images Found: {}", dirs_visited, img_count);
 
         self.paths
     }

@@ -247,18 +247,16 @@ pub struct LoadedAndHashed {
 }
 
 impl LoadedAndHashed {
-    pub fn collate<F, Fut>(self, interval: Option<Duration>, mut during: F) -> CollatedResults
-    where F: FnMut(Duration) + Send {
+    pub fn collate<F>(self, interval: Option<Duration>, mut during: F) -> CollatedResults
+    where F: FnMut() + Send {
         let Self { pool, results, settings } = self;
 
         let images = results.images;
 
         let (tx, mut rx) = oneshot::channel();
 
-        let start = Instant::now();
-
         let during_fut = future::poll_fn(|| {
-            during(start.elapsed());
+            during();
             rx.poll()
         });
 

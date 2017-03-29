@@ -74,8 +74,7 @@ pub struct Bytes(pub u64);
 
 impl Display for Bytes {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        // Upgrade to the next unit at 10x the conversion rate so we don't get
-        // single-digit numbers
+        // The gigabytes number usually moves too slow for good feedback so we go down to hundreths
         if self.0 >= 1_000_000_000 {
             write!(f, "{}.{:02} GB", Number(self.0 / 1_000_000_000), self.0 / 10_000_000 % 100)
         } else if self.0 >= 1_000_000 {
