@@ -19,7 +19,6 @@ use std::mem;
 
 use model::{Image, HashedImage, CollatedResults};
 use hash::HashSettings;
-use search::SearchSettings;
 
 struct LoadedImage {
     data: DynamicImage,
@@ -27,7 +26,7 @@ struct LoadedImage {
 }
 
 impl LoadedImage {
-    pub fn hash(self, settings: &HashSettings) -> HashedImage {
+    fn hash(self, settings: &HashSettings) -> HashedImage {
         let (hash, hash_time) = time_span_ms(|| settings.hash(&self.data));
 
         HashedImage {
@@ -55,6 +54,9 @@ fn duration_millis(duration: Duration) -> u64 {
 fn load_image(path: PathBuf) -> Result<LoadedImage, ::Error> {
     let (res, load_time) = time_span_ms(|| {
         let mut reader = BufReader::new(File::open(&path)?);
+        // Guess the format based on magic bytes instead of file extension since
+        // the extension isn't always correct; this is a surprisingly common issue
+        // with images from the web.
         let fmt = image::guess_format(reader.fill_buf()?)?;
         image::load(reader, fmt)
     });
@@ -190,62 +192,30 @@ impl FromParallelIterator<CollectWork> for WorkResults {
 
 pub struct Worker {
     pool: ThreadPool,
-}
-
-impl Worker {
-    pub fn search<F>(self, settings: SearchSettings, mut with_path: F) -> WorkerReady
-        where F: FnMut(&Path) {
-        let mut paths = vec![];
-
-        settings.search(
-            |path| {
-                with_path(&path);
-                paths.push(path);
-            },
-            // Continue on errors for now
-            |_| true
-        );
-
-        WorkerReady {
-            pool: self.pool,
-            paths: paths,
-        }
-    }
-}
-
-pub struct WorkerReady {
-    pool: ThreadPool,
     paths: Vec<PathBuf>,
 }
 
-impl WorkerReady {
+impl Worker {
     pub fn load_and_hash<F>(self, settings: HashSettings, mut during: F) -> LoadedAndHashed
-    where F: FnMut(Duration, WorkStatus) + Send {
+    where F: FnMut(WorkStatus) + Send {
         let Self { pool, paths } = self;
         let threads = pool.num_threads();
 
         let (tx, rx) = mpsc::channel(1);
 
-        let start = Instant::now();
+        let mut curr_status = WorkStatus::default();
 
-        let mut curr_status = WorkStatus {
-            count: 0,
-            errors: 0,
-            total_bytes: 0,
-            load_time: 0,
-            hash_time: 0,
-        };
+        during(curr_status.clone());
 
         let during_fut = rx.for_each(|status|{
-            let elapsed = start.elapsed();
             curr_status.add(status);
-            during(elapsed, curr_status.clone());
+            during(curr_status.clone());
             Ok(())
         });
 
         let results = pool.install(||
             rayon::join(
-                || executor::spawn(during_fut).wait_future(),
+                || executor::spawn(during_fut).park_timeout(Duration::from_secs(1)).wait_future(),
                 move || {
                     // Precompute DCT matrix on every thread
                     (0 .. threads).into_par_iter().weight_max()
@@ -313,14 +283,7 @@ impl LoadedAndHashed {
 }
 
 fn poll_on_interval<F>(interval: Option<Duration>, fut: F) where F: Future {
-    use futures::Async::*;
-
-    let mut spawn = executor::spawn(fut);
-    let unpark = UnparkTimeout::new(interval);
-
-    while let Ok(NotReady) = spawn.poll_future(unpark.clone()) {
-        unpark.park();
-    }
+    let _ = executor::spawn(fut).park_timeout(interval).wait_future();
 }
 
 struct IgnoreUnpark;
@@ -329,35 +292,7 @@ impl Unpark for IgnoreUnpark {
     fn unpark(&self) {}
 }
 
-struct UnparkTimeout {
-    thread: Thread,
-    timeout: Option<Duration>,
-}
-
-impl UnparkTimeout {
-    fn new(timeout: Option<Duration>) -> Arc<UnparkTimeout> {
-        Arc::new(UnparkTimeout {
-            thread: thread::current(),
-            timeout: timeout,
-        })
-    }
-
-    fn park(&self) {
-        if let Some(dur) = self.timeout {
-            thread::park_timeout(dur);
-        } else {
-            thread::park();
-        }
-    }
-}
-
-impl Unpark for UnparkTimeout {
-    fn unpark(&self) {
-        self.thread.unpark();
-    }
-}
-
-pub fn worker(threads: Option<usize>) -> Worker {
+pub fn worker(threads: Option<usize>, paths: Vec<PathBuf>) -> Worker {
     use rayon::Configuration;
 
     let config = if let Some(threads) = threads {
@@ -368,5 +303,6 @@ pub fn worker(threads: Option<usize>) -> Worker {
 
     Worker {
         pool: ThreadPool::new(config).expect("Error initializing thread pool"),
+        paths: paths,
     }
 }

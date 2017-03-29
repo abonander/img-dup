@@ -5,7 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 clap = "*"
-futures = "*"
+futures = { path = "../futures-rs/" }
 image = "*"
 log = "*"
 rayon = "*"
@@ -16,4 +16,9 @@ vec-vp-tree = { version = "0.2.0-alpha.1", default_features = false }
 
 [dependencies.img_hash]
 features = ["rust-image"]
-version = "*"
+# version = "*"
+path = "../img_hash/"
+
+[[bin]]
+name = "img-dup"
+path = "src/bin/img-dup/main.rs"

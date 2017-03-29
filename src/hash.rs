@@ -2,6 +2,8 @@ use img_hash::HashType as TrueHashType;
 
 use img_hash::{HashImage, ImageHash};
 
+use std::io::{self, Write};
+
 macro_rules! hash_types {
     ($($name:ident, $dispnm:expr, $serializenm:expr, $desc:expr);+;) => {
         #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,7 +124,7 @@ impl Default for HashSettings {
     fn default() -> Self {
         HashSettings {
             hash_size: 8,
-            hash_type: HashType::Gradient,
+            hash_type: HashType::default(),
         }
     }
 }

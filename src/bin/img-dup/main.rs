@@ -4,9 +4,18 @@ extern crate img_dup as common;
 
 use clap::{App, ArgMatches};
 
+use std::io::{self, Write};
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
+
 use common::hash::{self, HashSettings};
 use common::search::SearchSettings;
 use common::serialize::SerializeSettings;
+use common::work::{self, WorkStatus};
+
+use format::*;
+
+mod format;
 
 fn is_nonzero(int: String) -> Result<(), String> {
     match int.parse::<u64>() {
@@ -37,7 +46,7 @@ fn app() -> App<'static, 'static> {
               "Add one or more file extensions to the search parameters; 'gif', 'png', and 'jpg' \
                are included by default.")
 
-        (@arg no_default_exts: --("no-default-exts") requires[ext]
+        (@arg no_default_exts: --no_default_exts requires[ext]
               "Don't include the default extensions ('gif', 'png', 'jpg').")
 
         (@arg recursive: -r --recursive "If supplied, recursively searches subdirectories.")
@@ -46,15 +55,15 @@ fn app() -> App<'static, 'static> {
               "The path for the results output; defaults to 'img-dup.json' in the \
                current directory.")
 
-        (@arg hash_size: -s --("hash-size") [integer] {is_nonzero}
+        (@arg hash_size: -s --hash_size [integer] {is_nonzero}
               "The square of this number will be the number bits to use in the hash; \
                defaults to 8 (64).")
 
-        (@arg hash_type: -h --("hash-type") [string] {hash::validate_type}
+        (@arg hash_type: -h --hash_type [string] {hash::validate_type}
               "The hash type to use. Defaults to `grad`. Run `img-dup --list-hash-types` to list \
                all the currently supported hash types.")
 
-        (@arg k_nearest: -k [integer] --("k-nearest") {is_int} conflicts_with[distance]
+        (@arg k_nearest: -k [integer] --k_nearest {is_int} conflicts_with[distance]
               "Set the number of similar images to collect for each image; defaults to 5, \
                can be zero. Conflicts with `--distance`")
 
@@ -62,10 +71,10 @@ fn app() -> App<'static, 'static> {
               "Set the maximum number of bits between hashes to consider two images similar; \
                can be zero (match exact duplicates). Conflicts with `--k-nearest`.")
 
-        (@arg list_hash_types: --("list-hash-types")
+        (@arg list_hash_types: --list_hash_types
               "Print all the currently supported hash types and exit.")
 
-        (@arg pretty_indent: --("pretty-indent") [integer] {is_nonzero}
+        (@arg pretty_indent: --pretty_indent [integer] {is_nonzero}
               "Pretty-print the outputted JSON by the given number of spaces per indent level.")
 
         (@arg directory: "The directory to search; if not given, searches the current directory. \
@@ -139,4 +148,127 @@ fn main() {
     }
 
     let settings = args_to_settings(&args);
+
+    println!("Searching for images...");
+
+    let paths = SearchUi::new().find_images(&settings.search);
+
+    println!("Hashing images...");
+
+    let mut hash_ui = HashUi::new();
+
+    let results = work::worker(settings.threads, paths)
+        .load_and_hash(settings.hash, |status| hash_ui.status_update(status));
+
+    println!();
+}
+
+struct StatusUpdater {
+    interval: Duration,
+    last: Instant,
+    stdout: io::Stdout,
+}
+
+impl StatusUpdater {
+    fn new(interval: Duration) -> Self {
+        let last = Instant::now() - interval;
+
+        StatusUpdater {
+            interval: interval,
+            last: last,
+            stdout: io::stdout(),
+        }
+    }
+
+    fn update<F: FnOnce()>(&mut self, print: F) {
+        if self.last.elapsed() < self.interval {
+            return;
+        }
+
+        self.last = Instant::now();
+
+        print();
+
+        write!(self.stdout, "\r").and(self.stdout.flush())
+            .expect("stdout has been closed");
+    }
+}
+
+struct SearchUi {
+    paths: Vec<PathBuf>,
+    dirs_visited: u32,
+    status: StatusUpdater,
+}
+
+impl SearchUi {
+    fn new() -> Self {
+        SearchUi {
+            paths: vec![],
+            dirs_visited: 1,
+            status: StatusUpdater::new(Duration::from_millis(1)),
+        }
+    }
+
+    fn find_images(mut self, settings: &SearchSettings) -> Vec<PathBuf> {
+        settings.search(|event| {
+            use common::search::WalkEvent::*;
+
+            match event {
+                File(pathbuf) => self.paths.push(pathbuf),
+                Dir(_) => self.dirs_visited += 1,
+                Error(_) => (),
+            }
+
+            self.status_update();
+
+            true
+        });
+
+        let dirs_visited = Number(self.dirs_visited);
+        let img_count = Number(self.paths.len());
+
+        println!("Directories Visited: {} Images Found: {}", dirs_visited, img_count);
+
+        self.paths
+    }
+
+    fn status_update(&mut self) {
+        let dirs_visited = Number(self.dirs_visited);
+        let img_count = Number(self.paths.len());
+
+        self.status.update(|| print!("Directories Visited: {} Images Found: {}",
+                                     dirs_visited, img_count));
+    }
+}
+
+struct HashUi {
+    start: Instant,
+    status: StatusUpdater
+}
+
+impl HashUi {
+    fn new() -> Self {
+        HashUi {
+            start: Instant::now(),
+            status: StatusUpdater::new(Duration::from_millis(250))
+        }
+    }
+
+    fn status_update(&mut self, status: WorkStatus) {
+        let elapsed = self.start.elapsed();
+        self.status.update(|| print_work_status(status, elapsed));
+    }
+}
+
+fn print_work_status(status: WorkStatus, elapsed: Duration) {
+    // bytes / ms = kb / s
+    let load_kbs = status.total_bytes.checked_div(status.load_time).unwrap_or(0) * 1000;
+    let hash_kbs = status.total_bytes.checked_div(status.hash_time).unwrap_or(0) * 1000;
+
+    let avg_load = status.load_time.checked_div(status.count as u64).unwrap_or(0);
+    let avg_hash = status.hash_time.checked_div(status.count as u64).unwrap_or(0);
+
+    print!("Elapsed: {} Processed: {} ({}) Load: {} ({} ms avg) Hash: {} ({} ms avg) Errors: {}",
+           Time(elapsed), Number(status.count), Bytes(status.total_bytes), ByteRate(load_kbs),
+           Number(avg_load), ByteRate(hash_kbs), Number(avg_hash), Number(status.errors))
 }
