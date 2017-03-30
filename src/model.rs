@@ -34,7 +34,13 @@ pub struct ImageDistFn;
 
 impl DistFn<HashedImage> for ImageDistFn {
     fn dist(&self, left: &HashedImage, right: &HashedImage) -> u64 {
-        left.hash.dist(&right.hash) as u64
+        let left = &left.hash.bitv;
+        let right = &right.hash.bitv;
+
+        assert_eq!(left.len(), right.len());
+
+        left.storage().iter().zip(right.storage())
+            .fold(0u64, |count, (&left, &right)| count + (left ^ right).count_ones() as u64)
     }
 }
 
