@@ -176,13 +176,9 @@ fn main() {
 
     let start = Instant::now();
 
-    callgrind::start_instrumentation();
-
     let collated = results.collate(Some(Duration::from_secs(1)), ||
         print!("\rCollating Elapsed: {}", Time(start.elapsed()))
     );
-
-    callgrind::stop_instrumentation();
 
     println!("\nCollating Complete. Elapsed: {}", Time(start.elapsed()));
 }
