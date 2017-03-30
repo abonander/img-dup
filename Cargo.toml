@@ -4,7 +4,7 @@ name = "img-dup"
 version = "0.1.0"
 
 [dependencies]
-callgrind = { path = "../callgrind-rs/", optional = true }
+# callgrind = { path = "../callgrind-rs/", optional = true }
 clap = "*"
 futures = { git = "https://github.com/abonander/futures-rs" }
 image = "*"

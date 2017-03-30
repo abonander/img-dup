@@ -2,6 +2,7 @@
 extern crate clap;
 extern crate img_dup as common;
 
+#[cfg(feature = "callgrind")]
 extern crate callgrind;
 
 use clap::{App, ArgMatches};
