@@ -170,8 +170,8 @@ fn main() {
 
     let mut hash_ui = HashUi::new();
 
-    let results = work::worker(settings.threads, paths)
-        .load_and_hash(settings.hash, |status| hash_ui.status_update(status));
+    let results = work::worker(settings.threads)
+        .load_and_hash(paths, settings.hash, |status| hash_ui.status_update(status));
 
     println!("\nHashing complete. Collating ({})...", settings.compare_type);
 

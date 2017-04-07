@@ -6,10 +6,11 @@ version = "0.1.0"
 [dependencies]
 # callgrind = { path = "../callgrind-rs/", optional = true }
 clap = "*"
-futures = { git = "https://github.com/abonander/futures-rs" }
+futures = "0.1.9"
 image = "*"
 log = "*"
-rayon = "*"
+multiqueue = "0.3"
+rayon = "0.7"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"

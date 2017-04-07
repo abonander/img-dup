@@ -1,6 +1,6 @@
 use futures::sync::{mpsc, oneshot};
 use futures::executor::{self, Unpark, Spawn};
-use futures::{future, Future, Stream};
+use futures::{future, Async, AsyncSink, Future, Stream};
 
 use image::{self, DynamicImage, GenericImage};
 
@@ -8,11 +8,13 @@ use rayon::{self, ThreadPool};
 use rayon::prelude::*;
 
 use vp_tree::VpTree;
+use vp_tree::dist::KnownDist;
 
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::io::{BufReader, BufRead};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, Thread};
 use std::time::{Instant, Duration};
 use std::mem;
@@ -26,7 +28,7 @@ struct LoadedImage {
 }
 
 impl LoadedImage {
-    fn hash(self, settings: &HashSettings) -> HashedImage {
+    fn hash(self, settings: HashSettings) -> HashedImage {
         let (hash, hash_time) = time_span_ms(|| settings.hash(&self.data));
 
         HashedImage {
@@ -124,164 +126,59 @@ impl WorkStatus {
     }
 }
 
+type Sender = mpsc::Sender<WorkResult>;
+
 struct CollectWork {
-    images: Vec<HashedImage>,
-    errors: Vec<::Error>,
+    settings: HashSettings,
     unpark: Arc<Unpark>,
-    status: WorkStatus,
-    sender: Spawn<mpsc::Sender<WorkStatus>>,
+    sender: Spawn<mpsc::Sender<WorkResult>>,
+    overflow: Option<WorkResult>,
+    closed: bool,
 }
 
 impl CollectWork {
-    fn new(sender: mpsc::Sender<WorkStatus>) -> Self {
+    fn new(sender: mpsc::Sender<WorkResult>, settings: HashSettings) -> Self {
         CollectWork {
-            images: vec![],
-            errors: vec![],
+            settings: settings,
             // We'll be polling again shortly, no need to know
             unpark: Arc::new(IgnoreUnpark),
-            status: WorkStatus::default(),
             sender: executor::spawn(sender),
+            overflow: None,
+            closed: false,
         }
     }
 
-    fn add_result(&mut self, res: WorkResult) {
-        self.status.count += 1;
+    fn load_and_hash(mut self, path: PathBuf) -> Self {
+        if self.closed { return self; }
 
-        match res {
-            Ok(hashed) => {
-                self.status.total_bytes += hashed.image.loaded_size;
-                self.status.load_time += hashed.image.load_time;
-                self.status.hash_time += hashed.hash_time;
+        let res = load_image(path).map(|image| image.hash(self.settings));
 
-                self.images.push(hashed);
+        if let Some(overflow) = self.overflow.take() {
+            self.wait_send(overflow);
+        }
+
+        if let AsyncSink::NotReady(overflow) = self.try_send(res) {
+            self.overflow = Some(overflow);
+        }
+
+        self
+    }
+
+    fn try_send(&mut self, res: WorkResult) -> AsyncSink<WorkResult> {
+        match self.sender.start_send(res, &self.unpark) {
+            Ok(res) => res,
+            Err(_) => {
+                self.closed = true;
+                AsyncSink::Ready
             },
-            Err(error) => {
-                self.status.errors += 1;
-                self.errors.push(error);
-            },
         }
     }
 
-    fn try_send_update(&mut self) {
-        use futures::AsyncSink::Ready;
-
-        match self.sender.start_send(self.status.clone(), &self.unpark) {
-            Ok(Ready) => self.status = WorkStatus::default(),
-            // If the other end is dropped or the queue isn't ready yet, we don't care
-            _ => (),
+    fn wait_send(&mut self, res: WorkResult) {
+        if let Err(_) = self.sender.wait_send(res) {
+            self.closed = true;
         }
     }
-}
-
-type WorkResult = Result<HashedImage, ::Error>;
-
-impl FromParallelIterator<CollectWork> for WorkResults {
-    fn from_par_iter<P>(par_iter: P) -> Self where P: IntoParallelIterator<Item=CollectWork> {
-        par_iter.into_par_iter().map(|collect|
-            WorkResults {
-                images: collect.images,
-                errors: collect.errors
-            }
-        ).reduce(Self::default, |mut left, mut right| {
-            left.images.append(&mut right.images);
-            left.errors.append(&mut right.errors);
-            left
-        })
-    }
-}
-
-pub struct Worker {
-    pool: ThreadPool,
-    paths: Vec<PathBuf>,
-}
-
-impl Worker {
-    pub fn load_and_hash<F>(self, settings: HashSettings, mut during: F) -> LoadedAndHashed
-    where F: FnMut(WorkStatus) + Send {
-        let Self { pool, paths } = self;
-        let threads = pool.num_threads();
-
-        let (tx, rx) = mpsc::channel(1);
-
-        let mut curr_status = WorkStatus::default();
-
-        during(curr_status.clone());
-
-        let during_fut = rx.for_each(|status|{
-            curr_status.add(status);
-            during(curr_status.clone());
-            Ok(())
-        });
-
-        let results = pool.install(||
-            rayon::join(
-                || executor::spawn(during_fut).park_timeout(Duration::from_secs(1)).wait_future(),
-                move || {
-                    // Precompute DCT matrix on every thread
-                    (0 .. threads).into_par_iter().weight_max()
-                        .for_each(|_| settings.prepare());
-
-                    paths.into_par_iter().fold(|| CollectWork::new(tx.clone()),
-                                               |mut collect, path| {
-                        let res = load_image(path).map(|image| image.hash(&settings));
-                        collect.add_result(res);
-                        collect.try_send_update();
-                        collect
-                    }).collect()
-                }
-            ).1
-        );
-
-        LoadedAndHashed {
-            pool: pool,
-            results: results,
-            settings: settings
-        }
-    }
-}
-
-pub struct LoadedAndHashed {
-    pool: ThreadPool,
-    results: WorkResults,
-    settings: HashSettings,
-}
-
-impl LoadedAndHashed {
-    pub fn collate<F>(self, interval: Option<Duration>, mut during: F) -> CollatedResults
-    where F: FnMut() + Send {
-        let Self { pool, results, settings } = self;
-
-        let images = results.images;
-
-        let (tx, mut rx) = oneshot::channel();
-
-        let during_fut = future::poll_fn(|| {
-            during();
-            rx.poll()
-        });
-
-        let (collated, collate_time) = pool.install(||
-            rayon::join(
-                move || poll_on_interval(interval, during_fut),
-                move || {
-                    let ret = time_span_ms(move || VpTree::from_vec(images));
-                    let _ = tx.send(());
-                    ret
-                }
-            ).1
-        );
-
-        CollatedResults {
-            tree: collated,
-            collate_time: collate_time,
-            settings: settings,
-            errors: results.errors,
-        }
-    }
-}
-
-fn poll_on_interval<F>(interval: Option<Duration>, fut: F) where F: Future {
-    let _ = executor::spawn(fut).park_timeout(interval).wait_future();
 }
 
 struct IgnoreUnpark;
@@ -290,17 +187,126 @@ impl Unpark for IgnoreUnpark {
     fn unpark(&self) {}
 }
 
-pub fn worker(threads: Option<usize>, paths: Vec<PathBuf>) -> Worker {
+pub type WorkResult = Result<HashedImage, ::Error>;
+
+pub struct Worker {
+    pool: ThreadPool,
+}
+
+impl Worker {
+    fn join_pool<Fl, Fr, Rl, Rr>(&self, left: Fl, right: Fr) -> (Rl, Rr)
+    where Fl: FnOnce() -> Rl + Send, Fr: FnOnce() -> Rr + Send, Rl: Send, Rr: Send {
+        self.pool.install(
+            || rayon::join(left, right)
+        )
+    }
+
+    pub fn load_and_hash<F>(self, paths: Vec<PathBuf>, settings: HashSettings, mut collect: F)
+    where F: FnMut(WorkResult) + Send {
+        let threads = self.pool.current_num_threads();
+
+        // Use a capacity of log2(paths.len())
+        let (tx, rx) = mpsc::channel(paths.len().leading_zeros() as usize);
+
+        let during_fut = rx.for_each(|result| {
+            collect(result);
+            Ok(())
+        });
+
+        self.join_pool(
+            || poll_on_interval(Duration::from_secs(1), during_fut),
+            move || {
+                use rayon::iter::IndexedParallelIterator;
+
+                // Precompute DCT matrix on every thread
+                (0..threads).into_par_iter().with_max_len(1)
+                    .for_each(|_| settings.prepare());
+
+                paths.into_par_iter().fold(|| CollectWork::new(tx.clone(), settings),
+                                           CollectWork::load_and_hash)
+                    // Kill the workers early if the queue is closed.
+                    .any(|collect| collect.closed)
+            }
+        );
+    }
+
+    pub fn collate<F, T: KnownDist + Send>(self, images: Vec<T>, interval: Duration, mut during: F)
+    -> Collated<T> where F: FnMut() + Send, T::DistFn: Send {
+        let (tx, mut rx) = oneshot::channel();
+
+        let during_fut = future::poll_fn(|| {
+            during();
+            rx.poll()
+        });
+
+        let (collated, collate_time) = self.join_pool(
+            move || poll_on_interval(interval, during_fut),
+            move || {
+                let ret = time_span_ms(move || VpTree::from_vec(images));
+                let _ = tx.send(());
+                ret
+            }
+        ).1;
+
+        Collated {
+            tree: collated,
+            time: collate_time,
+        }
+    }
+}
+
+pub struct Collated<T: KnownDist> {
+    pub tree: VpTree<T, T::DistFn>,
+    pub time: u64,
+}
+
+fn poll_on_interval<F>(interval: Duration, fut: F) where F: Future {
+    let unpark = ThreadUnpark::new_arc();
+
+    let mut spawn = executor::spawn(fut);
+
+    while let Ok(Async::NotReady) = spawn.poll_future(unpark.clone()) {
+        unpark.park_timeout(interval);
+    }
+}
+
+struct ThreadUnpark {
+    thread: thread::Thread,
+    ready: AtomicBool,
+}
+
+impl ThreadUnpark {
+    fn new_arc() -> Arc<ThreadUnpark> {
+        Arc::new(ThreadUnpark {
+            thread: thread::current(),
+            ready: AtomicBool::new(false),
+        })
+    }
+
+    fn park_timeout(&self, timeout: Duration) {
+        if !self.ready.swap(false, Ordering::Acquire) {
+            thread::park_timeout(timeout);
+        }
+    }
+}
+
+impl Unpark for ThreadUnpark {
+    fn unpark(&self) {
+        self.ready.store(true, Ordering::Release);
+        self.thread.unpark();
+    }
+}
+
+pub fn worker(threads: Option<usize>) -> Worker {
     use rayon::Configuration;
 
     let config = if let Some(threads) = threads {
-        Configuration::new().set_num_threads(threads)
+        Configuration::new().num_threads(threads)
     } else {
         Configuration::new()
     };
 
     Worker {
         pool: ThreadPool::new(config).expect("Error initializing thread pool"),
-        paths: paths,
     }
 }
